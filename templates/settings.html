@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Account</div>
+    <h1>Settings</h1>
+    <p class="sub">Manage your privacy, appearance, and system logs.</p>
+  </div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px; max-width: 560px;">
+  <a href="{{ url_for('view_profile') }}" class="card" style="display: flex; align-items: center; gap: 14px; padding: 18px 20px; text-decoration: none; color: var(--text); transition: border-color 0.12s ease;">
+    <span style="font-size: 22px;">🪪</span>
+    <span style="flex: 1;">
+      <span style="display: block; font-weight: 700; font-size: 15px;">View Profile</span>
+      <span style="display: block; font-size: 13px; color: var(--text-muted); margin-top: 2px;">View and edit your own name, email, and phone</span>
+    </span>
+    <span style="color: var(--text-muted);">›</span>
+  </a>
+
+  <a href="{{ url_for('privacy') }}" class="card" style="display: flex; align-items: center; gap: 14px; padding: 18px 20px; text-decoration: none; color: var(--text); transition: border-color 0.12s ease;">
+    <span style="font-size: 22px;">🔒</span>
+    <span style="flex: 1;">
+      <span style="display: block; font-weight: 700; font-size: 15px;">Privacy</span>
+      <span style="display: block; font-size: 13px; color: var(--text-muted); margin-top: 2px;">Your profile photo and account details</span>
+    </span>
+    <span style="color: var(--text-muted);">›</span>
+  </a>
+
+  <a href="{{ url_for('app_theme') }}" class="card" style="display: flex; align-items: center; gap: 14px; padding: 18px 20px; text-decoration: none; color: var(--text); transition: border-color 0.12s ease;">
+    <span style="font-size: 22px;">🎨</span>
+    <span style="flex: 1;">
+      <span style="display: block; font-weight: 700; font-size: 15px;">App Theme</span>
+      <span style="display: block; font-size: 13px; color: var(--text-muted); margin-top: 2px;">System Default, Dark Mode, or Light Mode</span>
+    </span>
+    <span style="color: var(--text-muted);">›</span>
+  </a>
+
+  {% if current_role == 'Admin' %}
+  <a href="{{ url_for('audit_logs') }}" class="card" style="display: flex; align-items: center; gap: 14px; padding: 18px 20px; text-decoration: none; color: var(--text); transition: border-color 0.12s ease;">
+    <span style="font-size: 22px;">◷</span>
+    <span style="flex: 1;">
+      <span style="display: block; font-weight: 700; font-size: 15px;">Audit Logs</span>
+      <span style="display: block; font-size: 13px; color: var(--text-muted); margin-top: 2px;">A record of actions taken across the system</span>
+    </span>
+    <span style="color: var(--text-muted);">›</span>
+  </a>
+  {% endif %}
+</div>
+
+<style>
+  .app-shell a.card:hover { border-color: var(--primary); }
+</style>
+
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Security</div>
+    <h1>Audit Logs</h1>
+    <p class="sub">Most recent 300 events, newest first.</p>
+  </div>
+  {% if logs %}
+  <form method="post" action="{{ url_for('clear_audit_logs') }}"
+        onsubmit="return confirm('Clear all audit logs? This cannot be undone.');">
+    <button type="submit" class="btn btn-danger btn-sm">Clear All</button>
+  </form>
+  {% endif %}
+</div>
+
+<form method="get" action="{{ url_for('audit_logs') }}" class="filter-bar" style="margin-bottom: 16px;">
+  <input
+    class="search-input"
+    type="text"
+    name="action"
+    value="{{ action_filter }}"
+    placeholder="Filter by action (e.g. Login, Employee added)…"
+  />
+  {% if action_filter %}
+  <a href="{{ url_for('audit_logs') }}" class="btn btn-ghost btn-sm">Clear</a>
+  {% endif %}
+</form>
+
+<div class="card" style="padding: 0;">
+  <div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>User</th>
+        <th>Role</th>
+        <th>Action</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td style="color: var(--text-muted); white-space: nowrap;">{{ log['timestamp'] }}</td>
+        <td style="font-weight: 600;">{{ log['username'] }}</td>
+        <td style="color: var(--text-muted);">{{ log['role'] or '—' }}</td>
+        <td>{{ log['action'] }}</td>
+        <td style="color: var(--text-muted);">{{ log['details'] or '—' }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" style="color: var(--text-muted);">No audit events yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, avatar %}
+{% block title %}Dashboard {% endblock %}
+{% block content %}
+
+{% if employee_view %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Overview</div>
+    <h1>Welcome{{ ', ' + employee['name'] if employee else '' }}</h1>
+    <p class="sub">Your personal snapshot.</p>
+  </div>
+  <a href="{{ url_for('apply_leave') }}" class="btn btn-primary">+ Apply for Leave</a>
+</div>
+
+<div class="stat-row">
+  <div class="card stat-card">
+    <div class="stat-corner" style="background: var(--primary);"></div>
+    <div class="stat-label">Present Days (this month)</div>
+    <div class="stat-value">{{ my_attendance.get('Present', 0) }}</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-corner" style="background: var(--accent-amber);"></div>
+    <div class="stat-label">Absent Days (this month)</div>
+    <div class="stat-value">{{ my_attendance.get('Absent', 0) }}</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-corner" style="background: var(--accent-green);"></div>
+    <div class="stat-label">Status</div>
+    <div class="stat-value" style="font-size: 20px;">{{ status_badge(employee['status']) if employee else '—' }}</div>
+  </div>
+</div>
+
+<div class="card" style="padding: 0;">
+  <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px;">
+    My Recent Leave Requests
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>From</th>
+        <th>To</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in my_leaves %}
+      <tr>
+        <td>{{ l['leave_type'] }}</td>
+        <td style="color: var(--text-muted);">{{ l['start_date'] }}</td>
+        <td style="color: var(--text-muted);">{{ l['end_date'] }}</td>
+        <td>{{ l['status'] }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4" style="color: var(--text-muted);">No leave requests yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% else %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Overview</div>
+    <h1>Welcome{{ ', ' + employee['name'] if employee else '' }}</h1>
+    <p class="sub">Here's what's happening with your team today.</p>
+  </div>
+  <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+    <a href="{{ url_for('add_employee') }}" class="btn btn-primary">+ Add Employee</a>
+    <span style="font-size: 12px; color: var(--text-muted);">📅 {{ today_display }}</span>
+  </div>
+</div>
+
+<div class="stat-row">
+  <a href="{{ url_for('employee_list') }}" class="card stat-card stat-card-link">
+    <div class="stat-corner" style="background: var(--primary);"></div>
+    <div class="stat-label">Total Employees</div>
+    <div class="stat-value">{{ total }}</div>
+  </a>
+  <a href="{{ url_for('employee_list', status='Active') }}" class="card stat-card stat-card-link">
+    <div class="stat-corner" style="background: var(--accent-green);"></div>
+    <div class="stat-label">Active</div>
+    <div class="stat-value">{{ active }}</div>
+  </a>
+  <a href="{{ url_for('employee_list', status='On Leave') }}" class="card stat-card stat-card-link">
+    <div class="stat-corner" style="background: var(--accent-amber);"></div>
+    <div class="stat-label">On Leave</div>
+    <div class="stat-value">{{ on_leave }}</div>
+  </a>
+  <a href="{{ url_for('departments') }}" class="card stat-card stat-card-link">
+    <div class="stat-corner" style="background: var(--accent-red);"></div>
+    <div class="stat-label">Departments</div>
+    <div class="stat-value">{{ departments }}</div>
+  </a>
+</div>
+
+<div class="stat-row">
+  <a href="{{ url_for('leave_list', status='Pending') }}" class="card stat-card stat-card-link">
+    <div class="stat-corner" style="background: var(--primary);"></div>
+    <div class="stat-label">Pending Leave Requests</div>
+    <div class="stat-value">{{ pending_leaves }}</div>
+  </a>
+  <a href="{{ url_for('attendance') }}" class="card stat-card stat-card-link">
+    <div class="stat-corner" style="background: var(--accent-green);"></div>
+    <div class="stat-label">Attendance Marked Today</div>
+    <div class="stat-value">{{ today_marked }} / {{ total }}</div>
+  </a>
+</div>
+
+<div class="eyebrow" style="margin-bottom: 10px;">Quick Stats</div>
+<div class="stat-row">
+  <a href="{{ url_for('attendance') }}" class="card stat-card stat-card-link">
+    <div class="stat-corner" style="background: var(--accent-green);"></div>
+    <div class="stat-label">Today's Attendance %</div>
+    <div class="stat-value">{{ today_attendance_pct }}%</div>
+  </a>
+  <a href="{{ url_for('attendance', filter='Absent') }}" class="card stat-card stat-card-link">
+    <div class="stat-corner" style="background: var(--accent-amber);"></div>
+    <div class="stat-label">Absent Employees</div>
+    <div class="stat-value">{{ today_absent }}</div>
+  </a>
+  <a href="{{ url_for('employee_list', new_this_month=1) }}" class="card stat-card stat-card-link">
+    <div class="stat-corner" style="background: var(--primary);"></div>
+    <div class="stat-label">New Employees This Month</div>
+    <div class="stat-value">{{ new_this_month }}</div>
+  </a>
+</div>
+
+<div class="eyebrow" style="margin-bottom: 10px;">Insights</div>
+<div class="chart-grid">
+  <div class="card chart-card">
+    <div class="chart-card-title">Employee Status</div>
+    <div class="chart-wrap" id="statusPieChart"></div>
+  </div>
+  <div class="card chart-card">
+    <div class="chart-card-title">Employees per Department</div>
+    <div class="chart-wrap" id="deptBarChart"></div>
+  </div>
+  <div class="card chart-card chart-card-wide">
+    <div class="chart-card-title">Monthly Attendance (Present, last 6 months)</div>
+    <div class="chart-wrap" id="attendanceLineChart"></div>
+  </div>
+</div>
+
+<div class="card" style="padding: 0;">
+  <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px;">
+    Recently Added
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Department</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in recent %}
+      <tr>
+        <td>
+          <div class="name-cell">
+            {{ avatar(e['name']) }}
+            {{ e['name'] }}
+          </div>
+        </td>
+        <td style="color: var(--text-muted);">{{ e['department'] }}</td>
+        <td>{{ status_badge(e['status']) }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="3" style="color: var(--text-muted);">No employees yet — add one to get started.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  (function () {
+    // ---- theme colors ----
+    var styles = getComputedStyle(document.documentElement);
+    var textMuted = styles.getPropertyValue('--text-muted').trim() || '#888';
+    var border = styles.getPropertyValue('--border').trim() || '#3a3a3a';
+    var surface = styles.getPropertyValue('--surface').trim() || '#1e1e1e';
+    var palette = {
+      primary: styles.getPropertyValue('--primary').trim() || '#4f8cff',
+      green: styles.getPropertyValue('--accent-green').trim() || '#3fb950',
+      amber: styles.getPropertyValue('--accent-amber').trim() || '#d9a441',
+      red: styles.getPropertyValue('--accent-red').trim() || '#e5534b',
+      purple: '#7c5cb8',
+      teal: '#3d8f8f',
+    };
+    var colorCycle = [palette.primary, palette.green, palette.amber, palette.red, palette.purple, palette.teal];
+    var SVGNS = 'http://www.w3.org/2000/svg';
+
+    function el(tag, attrs) {
+      var e = document.createElementNS(SVGNS, tag);
+      for (var k in attrs) { e.setAttribute(k, attrs[k]); }
+      return e;
+    }
+
+    function emptyState(container, message) {
+      var p = document.createElement('div');
+      p.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;color:' + textMuted + ';font-size:13px;';
+      p.textContent = message;
+      container.appendChild(p);
+    }
+
+    // ---- Pie chart: Employee Status ----
+    (function renderPie() {
+      var container = document.getElementById('statusPieChart');
+      var labels = {{ status_labels|tojson }};
+      var counts = {{ status_counts|tojson }};
+      var total = counts.reduce(function (a, b) { return a + b; }, 0);
+      if (!total) { emptyState(container, 'No employee data yet.'); return; }
+
+      var size = 220, cx = size / 2, cy = size / 2, r = size / 2 - 4;
+      var svg = el('svg', { viewBox: '0 0 ' + size + ' ' + size, width: '100%', height: '100%' });
+      var startAngle = -Math.PI / 2;
+
+      labels.forEach(function (label, i) {
+        var value = counts[i];
+        var frac = value / total;
+        var endAngle = startAngle + frac * Math.PI * 2;
+        var x1 = cx + r * Math.cos(startAngle), y1 = cy + r * Math.sin(startAngle);
+        var x2 = cx + r * Math.cos(endAngle), y2 = cy + r * Math.sin(endAngle);
+        var largeArc = frac > 0.5 ? 1 : 0;
+        var d = frac >= 0.999
+          ? 'M ' + cx + ' ' + (cy - r) + ' A ' + r + ' ' + r + ' 0 1 1 ' + (cx - 0.001) + ' ' + (cy - r) + ' Z'
+          : ['M', cx, cy, 'L', x1, y1, 'A', r, r, 0, largeArc, 1, x2, y2, 'Z'].join(' ');
+        var path = el('path', { d: d, fill: colorCycle[i % colorCycle.length], stroke: surface, 'stroke-width': 2 });
+        var title = el('title', {});
+        title.textContent = label + ': ' + value;
+        path.appendChild(title);
+        svg.appendChild(path);
+        startAngle = endAngle;
+      });
+
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;align-items:center;gap:20px;height:100%;';
+      var chartBox = document.createElement('div');
+      chartBox.style.cssText = 'width:150px;height:150px;flex-shrink:0;';
+      chartBox.appendChild(svg);
+      wrap.appendChild(chartBox);
+
+      var legend = document.createElement('div');
+      legend.style.cssText = 'display:flex;flex-direction:column;gap:8px;font-size:13px;';
+      labels.forEach(function (label, i) {
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+        var swatch = document.createElement('span');
+        swatch.style.cssText = 'width:10px;height:10px;border-radius:2px;background:' + colorCycle[i % colorCycle.length] + ';display:inline-block;';
+        var text = document.createElement('span');
+        text.style.color = textMuted;
+        text.textContent = label + ' (' + counts[i] + ')';
+        row.appendChild(swatch);
+        row.appendChild(text);
+        legend.appendChild(row);
+      });
+      wrap.appendChild(legend);
+      container.appendChild(wrap);
+    })();
+
+    // ---- Bar chart: Employees per Department ----
+    (function renderBar() {
+      var container = document.getElementById('deptBarChart');
+      var labels = {{ dept_labels|tojson }};
+      var counts = {{ dept_counts|tojson }};
+      if (!labels.length) { emptyState(container, 'No department data yet.'); return; }
+
+      var maxVal = Math.max.apply(null, counts.concat([1]));
+      var w = 400, h = 240, padLeft = 28, padBottom = 34, padTop = 12, padRight = 8;
+      var chartW = w - padLeft - padRight, chartH = h - padTop - padBottom;
+      var svg = el('svg', { viewBox: '0 0 ' + w + ' ' + h, width: '100%', height: '100%', preserveAspectRatio: 'none' });
+
+      // gridlines
+      var gridLines = 4;
+      for (var g = 0; g <= gridLines; g++) {
+        var y = padTop + (chartH / gridLines) * g;
+        svg.appendChild(el('line', { x1: padLeft, y1: y, x2: w - padRight, y2: y, stroke: border, 'stroke-width': 1 }));
+        var val = Math.round(maxVal - (maxVal / gridLines) * g);
+        var t = el('text', { x: padLeft - 6, y: y + 4, 'text-anchor': 'end', 'font-size': 10, fill: textMuted });
+        t.textContent = val;
+        svg.appendChild(t);
+      }
+
+      var slot = chartW / labels.length;
+      var barW = Math.min(34, slot * 0.5);
+      labels.forEach(function (label, i) {
+        var value = counts[i];
+        var barH = maxVal ? (value / maxVal) * chartH : 0;
+        var x = padLeft + slot * i + (slot - barW) / 2;
+        var y = padTop + chartH - barH;
+        var rect = el('rect', { x: x, y: y, width: barW, height: barH, rx: 4, fill: palette.primary });
+        var title = el('title', {});
+        title.textContent = label + ': ' + value;
+        rect.appendChild(title);
+        svg.appendChild(rect);
+
+        var label_text = el('text', {
+          x: x + barW / 2, y: h - padBottom + 16, 'text-anchor': 'middle', 'font-size': 10, fill: textMuted
+        });
+        var shortLabel = label.length > 10 ? label.slice(0, 9) + '…' : label;
+        label_text.textContent = shortLabel;
+        svg.appendChild(label_text);
+      });
+
+      container.appendChild(svg);
+    })();
+
+    // ---- Line chart: Monthly Attendance ----
+    (function renderLine() {
+      var container = document.getElementById('attendanceLineChart');
+      var labels = {{ month_labels|tojson }};
+      var counts = {{ month_present_counts|tojson }};
+      if (!labels.length) { emptyState(container, 'No attendance data yet.'); return; }
+
+      var maxVal = Math.max.apply(null, counts.concat([1]));
+      var w = 800, h = 240, padLeft = 30, padBottom = 26, padTop = 14, padRight = 14;
+      var chartW = w - padLeft - padRight, chartH = h - padTop - padBottom;
+      var svg = el('svg', { viewBox: '0 0 ' + w + ' ' + h, width: '100%', height: '100%', preserveAspectRatio: 'none' });
+
+      var gridLines = 4;
+      for (var g = 0; g <= gridLines; g++) {
+        var y = padTop + (chartH / gridLines) * g;
+        svg.appendChild(el('line', { x1: padLeft, y1: y, x2: w - padRight, y2: y, stroke: border, 'stroke-width': 1 }));
+        var val = Math.round(maxVal - (maxVal / gridLines) * g);
+        var t = el('text', { x: padLeft - 6, y: y + 4, 'text-anchor': 'end', 'font-size': 10, fill: textMuted });
+        t.textContent = val;
+        svg.appendChild(t);
+      }
+
+      var stepX = labels.length > 1 ? chartW / (labels.length - 1) : 0;
+      var points = counts.map(function (value, i) {
+        var x = padLeft + stepX * i;
+        var y = padTop + chartH - (maxVal ? (value / maxVal) * chartH : 0);
+        return [x, y];
+      });
+
+      var linePath = points.map(function (p, i) { return (i === 0 ? 'M' : 'L') + p[0] + ' ' + p[1]; }).join(' ');
+      var areaPath = linePath + ' L ' + points[points.length - 1][0] + ' ' + (padTop + chartH) +
+        ' L ' + points[0][0] + ' ' + (padTop + chartH) + ' Z';
+
+      svg.appendChild(el('path', { d: areaPath, fill: palette.green, 'fill-opacity': 0.13, stroke: 'none' }));
+      svg.appendChild(el('path', { d: linePath, fill: 'none', stroke: palette.green, 'stroke-width': 2.5 }));
+
+      points.forEach(function (p, i) {
+        var dot = el('circle', { cx: p[0], cy: p[1], r: 4, fill: palette.green });
+        var title = el('title', {});
+        title.textContent = labels[i] + ': ' + counts[i];
+        dot.appendChild(title);
+        svg.appendChild(dot);
+
+        var label_text = el('text', {
+          x: p[0], y: h - padBottom + 16, 'text-anchor': 'middle', 'font-size': 10, fill: textMuted
+        });
+        label_text.textContent = labels[i];
+        svg.appendChild(label_text);
+      });
+
+      container.appendChild(svg);
+    })();
+  })();
+</script>
+{% endif %}
+
+{% endblock %}

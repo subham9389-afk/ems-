@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Privacy{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Account</div>
+    <h1>Privacy</h1>
+    <p class="sub">Manage your profile photo and account access.</p>
+  </div>
+</div>
+
+<div class="card" style="padding: 28px; display: flex; align-items: center; gap: 28px; flex-wrap: wrap;">
+
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+    <div class="avatar-circle">
+      {% if current_photo %}
+        <img src="{{ url_for('static', filename=current_photo) }}" alt="Profile photo" />
+      {% else %}
+        <span class="avatar-initial">{{ (current_full_name or current_username or '?')[0]|upper }}</span>
+      {% endif %}
+    </div>
+
+    <form method="post" action="{{ url_for('privacy') }}" enctype="multipart/form-data" id="photoForm" style="display: none;">
+      <input type="file" name="photo_add" id="addPhotoInput" accept="image/*" onchange="document.getElementById('photoForm').submit()" />
+      <input type="file" name="photo_click" id="clickPhotoInput" accept="image/*" capture="environment" onchange="document.getElementById('photoForm').submit()" />
+    </form>
+
+    {% if current_photo %}
+    <form method="post" action="{{ url_for('privacy') }}" id="removePhotoForm">
+      <input type="hidden" name="remove_photo" value="1" />
+    </form>
+    {% endif %}
+
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+      {% if current_photo %}
+      <button type="button" class="btn btn-danger btn-sm" onclick="confirmRemovePhoto()">🗑️ Remove Photo</button>
+      {% endif %}
+      <a href="{{ url_for('change_password') }}" class="btn btn-ghost btn-sm">🔒 Change Password</a>
+    </div>
+  </div>
+
+  <div style="flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 4px;">
+    <div style="font-size: 20px; font-weight: 700;">{{ current_full_name or current_username }}</div>
+    <div style="color: var(--text-muted); font-size: 13px;">@{{ current_username }} <span class="badge" style="margin-left: 4px;">{{ current_role }}</span></div>
+
+    <div style="display: flex; gap: 10px; margin-top: 18px;">
+      <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm">Logout</a>
+    </div>
+  </div>
+</div>
+
+<div id="cameraModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999; align-items: center; justify-content: center;">
+  <div class="card" style="padding: 20px; width: 380px; max-width: 92vw; display: flex; flex-direction: column; gap: 14px; align-items: center;">
+    <video id="cameraVideo" autoplay playsinline style="width: 100%; border-radius: 10px; background: #000; transform: scaleX(-1);"></video>
+    <canvas id="cameraCanvas" style="display: none;"></canvas>
+    <div style="display: flex; gap: 10px;">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="cancelCamera()">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="capturePhoto()">📸 Capture</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var cameraStream = null;
+
+  function confirmRemovePhoto() {
+    if (confirm('Remove your profile photo?')) {
+      document.getElementById('removePhotoForm').submit();
+    }
+  }
+
+  function openCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      document.getElementById('clickPhotoInput').click();
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+      .then(function (stream) {
+        cameraStream = stream;
+        var video = document.getElementById('cameraVideo');
+        video.srcObject = stream;
+        document.getElementById('cameraModal').style.display = 'flex';
+      })
+      .catch(function () {
+        // Camera unavailable/denied — fall back to the native file/camera picker.
+        document.getElementById('clickPhotoInput').click();
+      });
+  }
+
+  function stopCameraStream() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(function (track) { track.stop(); });
+      cameraStream = null;
+    }
+    document.getElementById('cameraModal').style.display = 'none';
+  }
+
+  function cancelCamera() {
+    stopCameraStream();
+  }
+
+  function capturePhoto() {
+    var video = document.getElementById('cameraVideo');
+    var canvas = document.getElementById('cameraCanvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    // Undo the mirrored preview so the saved photo isn't flipped.
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(function (blob) {
+      if (!blob) return;
+      var file = new File([blob], 'camera-photo.png', { type: 'image/png' });
+      var dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      var input = document.getElementById('clickPhotoInput');
+      input.files = dataTransfer.files;
+      stopCameraStream();
+      document.getElementById('photoForm').submit();
+    }, 'image/png');
+  }
+</script>
+
+{% endblock %}

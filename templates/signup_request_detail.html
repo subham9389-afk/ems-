@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Signup Request{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div style="display: flex; align-items: center; gap: 14px;">
+    {% if req %}{{ avatar(req['first_name'] + ' ' + req['last_name'], 48) }}{% endif %}
+    <div>
+      <div class="eyebrow">Signup Request</div>
+      <h1>{{ (req['first_name'] + ' ' + req['last_name']) if req else 'Not found' }}</h1>
+    </div>
+  </div>
+</div>
+
+{% if req %}
+<div class="card" style="padding: 24px; margin-bottom: 20px;">
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 14px;">
+    <div>
+      <div class="stat-label">Requested username</div>
+      <div style="margin-top: 4px;">{{ req['username'] }}</div>
+    </div>
+    <div>
+      <div class="stat-label">Status</div>
+      <div style="margin-top: 4px;">
+        {% if req['status'] == 'Pending' %}
+        <span class="badge badge-leave"><span class="dot"></span>Pending</span>
+        {% elif req['status'] == 'Approved' %}
+        <span class="badge badge-active"><span class="dot"></span>Approved</span>
+        {% else %}
+        <span class="badge badge-resigned"><span class="dot"></span>Rejected</span>
+        {% endif %}
+      </div>
+    </div>
+    <div>
+      <div class="stat-label">Email</div>
+      <div style="margin-top: 4px;">{{ req['email'] }}</div>
+    </div>
+    <div>
+      <div class="stat-label">Phone</div>
+      <div style="margin-top: 4px;">{{ req['phone'] or '—' }}</div>
+    </div>
+    <div>
+      <div class="stat-label">Department</div>
+      <div style="margin-top: 4px;">{{ req['department'] }}</div>
+    </div>
+    <div>
+      <div class="stat-label">Designation</div>
+      <div style="margin-top: 4px;">{{ req['role'] }}</div>
+    </div>
+    <div>
+      <div class="stat-label">Joining date</div>
+      <div style="margin-top: 4px;">{{ req['hire_date'] or '—' }}</div>
+    </div>
+    <div>
+      <div class="stat-label">Experience</div>
+      <div style="margin-top: 4px;">{{ (req['experience_years']|string + ' yrs') if req['experience_years'] is not none else '—' }}</div>
+    </div>
+    <div>
+      <div class="stat-label">Requested</div>
+      <div style="margin-top: 4px;"><span title="{{ req['requested_at'] }}">{{ req['requested_at']|timeago }}</span></div>
+    </div>
+    {% if req['decided_by'] %}
+    <div>
+      <div class="stat-label">Decided by</div>
+      <div style="margin-top: 4px;">{{ req['decided_by'] }} · <span title="{{ req['decided_at'] }}">{{ req['decided_at']|timeago }}</span></div>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if req['status'] == 'Pending' %}
+  <div style="margin-top: 22px; display: flex; gap: 10px;">
+    <form method="post" action="{{ url_for('approve_signup_request', req_id=req['id']) }}"
+          onsubmit="return confirm('Approve {{ req['first_name'] }} {{ req['last_name'] }}? This will create their employee record and login.');">
+      <button type="submit" class="btn btn-primary">Approve</button>
+    </form>
+    <form method="post" action="{{ url_for('reject_signup_request', req_id=req['id']) }}"
+          onsubmit="return confirm('Reject this request? No account will be created.');">
+      <button type="submit" class="btn btn-danger">Reject</button>
+    </form>
+  </div>
+  {% else %}
+  <div style="margin-top: 22px; display: flex; gap: 10px;">
+    <form method="post" action="{{ url_for('delete_signup_request', req_id=req['id']) }}"
+          onsubmit="return confirm('Delete this signup request? This only removes the request record, not the employee/login it created.');">
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="card wip-panel">
+  <div class="emoji">🔍</div>
+  <h3 style="font-size: 16px; margin-bottom: 6px;">No request with that ID</h3>
+</div>
+{% endif %}
+
+<a href="{{ url_for('signup_requests') }}" class="btn btn-ghost">← Back to requests</a>
+
+{% endblock %}

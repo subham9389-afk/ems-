@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Leave Management{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Leave</div>
+    <h1>{{ 'Leave Requests' if is_staff else 'My Leave Requests' }}</h1>
+    <p class="sub">{{ leaves|length }} request{{ 's' if leaves|length != 1 else '' }}</p>
+  </div>
+  <a href="{{ url_for('apply_leave') }}" class="btn btn-primary">+ Apply for Leave</a>
+</div>
+
+{% if is_staff %}
+<form method="get" action="{{ url_for('leave_list') }}" class="filter-bar" style="margin-bottom: 16px;">
+  <select name="status" class="filter-select" onchange="this.form.submit()">
+    <option value="">All statuses</option>
+    {% for s in statuses %}
+    <option value="{{ s }}" {% if s == selected_status %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  {% if selected_status %}
+  <a href="{{ url_for('leave_list') }}" class="btn btn-ghost btn-sm">Clear</a>
+  {% endif %}
+</form>
+{% endif %}
+
+<div class="card" style="padding: 0;">
+  <div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        {% if is_staff %}<th>Employee</th><th>Department</th>{% endif %}
+        <th>Type</th>
+        <th>From</th>
+        <th>To</th>
+        <th>Reason</th>
+        <th>Status</th>
+        {% if is_staff %}<th>Actions</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in leaves %}
+      <tr>
+        {% if is_staff %}
+        <td style="font-weight: 600;">{{ l['employee_name'] }}</td>
+        <td style="color: var(--text-muted);">{{ l['department'] }}</td>
+        {% endif %}
+        <td>{{ l['leave_type'] }}</td>
+        <td style="color: var(--text-muted);">{{ l['start_date'] }}</td>
+        <td style="color: var(--text-muted);">{{ l['end_date'] }}</td>
+        <td style="color: var(--text-muted);">{{ l['reason'] or '—' }}</td>
+        <td>
+          {% if l['status'] == 'Approved' %}
+            <span class="badge badge-active"><span class="dot"></span>Approved</span>
+          {% elif l['status'] == 'Rejected' %}
+            <span class="badge badge-resigned"><span class="dot"></span>Rejected</span>
+          {% else %}
+            <span class="badge badge-leave"><span class="dot"></span>Pending</span>
+          {% endif %}
+        </td>
+        {% if is_staff %}
+        <td>
+          {% if l['status'] == 'Pending' %}
+          <div class="row-actions">
+            <form method="post" action="{{ url_for('decide_leave', leave_id=l['id']) }}">
+              <input type="hidden" name="decision" value="Approved" />
+              <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+            </form>
+            <form method="post" action="{{ url_for('decide_leave', leave_id=l['id']) }}">
+              <input type="hidden" name="decision" value="Rejected" />
+              <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+            </form>
+          </div>
+          {% else %}
+          <span style="color: var(--text-muted); font-size: 13px;">by {{ l['decided_by'] or '—' }} on {{ l['decided_on'] or '—' }}</span>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="{{ 8 if is_staff else 5 }}" style="color: var(--text-muted);">No leave requests.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% endblock %}

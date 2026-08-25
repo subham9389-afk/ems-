@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Signup Requests{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Access requests</div>
+    <h1>Signup Requests</h1>
+    <p class="sub">
+      New accounts people have requested from the login page.
+      {% set pending = requests|selectattr('status', 'equalto', 'Pending')|list %}
+      {{ pending|length }} pending
+    </p>
+  </div>
+</div>
+
+<div class="card" style="padding: 0;">
+  <div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Username</th>
+        <th>Department</th>
+        <th>Designation</th>
+        <th>Requested</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in requests %}
+      <tr>
+        <td style="font-weight: 600;">
+          <div class="name-cell">
+            {{ avatar(r['first_name'] + ' ' + r['last_name']) }}
+            <a href="{{ url_for('signup_request_detail', req_id=r['id']) }}" style="color: inherit; text-decoration: none;">
+              {{ r['first_name'] }} {{ r['last_name'] }}
+            </a>
+          </div>
+        </td>
+        <td style="color: var(--text-muted);">{{ r['username'] }}</td>
+        <td>{{ r['department'] }}</td>
+        <td>{{ r['role'] }}</td>
+        <td style="color: var(--text-muted);"><span title="{{ r['requested_at'] }}">{{ r['requested_at']|timeago }}</span></td>
+        <td>
+          {% if r['status'] == 'Pending' %}
+          <span class="badge badge-leave"><span class="dot"></span>Pending</span>
+          {% elif r['status'] == 'Approved' %}
+          <span class="badge badge-active"><span class="dot"></span>Approved</span>
+          {% else %}
+          <span class="badge badge-resigned"><span class="dot"></span>Rejected</span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="row-actions">
+            <a href="{{ url_for('signup_request_detail', req_id=r['id']) }}" class="btn btn-ghost btn-sm">View</a>
+            {% if r['status'] == 'Pending' %}
+            <form method="post" action="{{ url_for('approve_signup_request', req_id=r['id']) }}"
+                  onsubmit="return confirm('Approve {{ r['first_name'] }} {{ r['last_name'] }}? This will create their employee record and login.');">
+              <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+            </form>
+            <form method="post" action="{{ url_for('reject_signup_request', req_id=r['id']) }}"
+                  onsubmit="return confirm('Reject this request? No account will be created.');">
+              <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+            </form>
+            {% else %}
+            <form method="post" action="{{ url_for('delete_signup_request', req_id=r['id']) }}"
+                  onsubmit="return confirm('Delete this signup request? This only removes the request record, not the employee/login it created.');">
+              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" style="color: var(--text-muted);">No signup requests yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% endblock %}

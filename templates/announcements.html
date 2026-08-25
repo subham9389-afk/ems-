@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Announcements{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Company</div>
+    <h1>Announcements</h1>
+    <p class="sub">Updates from Admin and HR.</p>
+  </div>
+  {% if can_post %}
+  <a href="{{ url_for('post_announcement') }}" class="btn btn-primary">+ Post Announcement</a>
+  {% endif %}
+</div>
+
+{% if announcements %}
+<div style="display: flex; flex-direction: column; gap: 14px;">
+  {% for a in announcements %}
+  <div class="card" style="padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+      <div>
+        <div style="font-weight: 700; font-size: 16px;">{{ a['title'] }}</div>
+        <div style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">
+          {{ a['posted_by'] }}{{ ' · ' + a['posted_by_role'] if a['posted_by_role'] else '' }} ·
+          <span title="{{ a['created_at'] }}">{{ a['created_at']|timeago }}</span>
+        </div>
+      </div>
+      {% if can_post %}
+      <div style="display: flex; gap: 8px; flex-shrink: 0;">
+        <a href="{{ url_for('edit_announcement', ann_id=a['id']) }}" class="btn btn-ghost btn-sm">Edit</a>
+        <form method="post" action="{{ url_for('delete_announcement', ann_id=a['id']) }}"
+              onsubmit="return confirm('Delete this announcement?');">
+          <button type="submit" class="btn btn-ghost btn-sm">Delete</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+    <p style="margin-top: 12px; font-size: 14px; white-space: pre-wrap;">{{ a['message'] }}</p>
+    {% if a['updated_at'] %}
+    <p style="color: var(--text-muted); font-size: 11px; margin-top: 8px;">Edited by {{ a['updated_by'] }} · <span title="{{ a['updated_at'] }}">{{ a['updated_at']|timeago }}</span></p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card" style="padding: 30px; text-align: center; color: var(--text-muted);">
+  No announcements yet.
+</div>
+{% endif %}
+
+{% endblock %}

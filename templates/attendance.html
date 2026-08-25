@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge %}
+{% block title %}Attendance{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Daily</div>
+    <h1>Attendance</h1>
+    {% if is_staff %}
+    <p class="sub">Mark who's in for {{ selected_date }}.</p>
+    {% elif selected_date == today %}
+    <p class="sub">Mark your own attendance for today.</p>
+    {% else %}
+    <p class="sub">Viewing your attendance for {{ selected_date }} (read-only — only today can be marked).</p>
+    {% endif %}
+  </div>
+</div>
+
+<form method="get" action="{{ url_for('attendance') }}" class="filter-bar" style="margin-bottom: 16px;">
+  <input
+    type="date"
+    name="date"
+    value="{{ selected_date }}"
+    max="{{ today }}"
+    class="search-input"
+    style="max-width: 200px;"
+    onchange="this.form.submit()"
+  />
+  {% if selected_date != today %}
+  <a href="{{ url_for('attendance', date=today) }}" class="btn btn-ghost btn-sm">Jump to today</a>
+  {% endif %}
+</form>
+
+<div class="stat-row" id="attendance-stat-row">
+  {% for status in statuses %}
+  <div class="card stat-card stat-card-clickable" data-status="{{ status }}" role="button" tabindex="0" title="Show only {{ status }}">
+    <div class="stat-corner" style="background: var(--primary);"></div>
+    <div class="stat-label">{{ status }}</div>
+    <div class="stat-value">{{ summary.get(status, 0) }}</div>
+  </div>
+  {% endfor %}
+</div>
+<p id="attendance-filter-note" style="display:none; color: var(--text-muted); margin: -4px 0 16px;">
+  Showing: <strong id="attendance-filter-label"></strong> —
+  <a href="#" id="attendance-filter-clear">Clear filter</a>
+</p>
+
+<form method="post" action="{{ url_for('attendance') }}">
+  <input type="hidden" name="date" value="{{ selected_date }}" />
+  <div class="card" style="padding: 0;">
+    <div style="overflow-x: auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Department</th>
+          <th>Designation</th>
+          <th>Attendance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in roster %}
+        <tr data-status="{{ entry.status }}">
+          <td style="font-weight: 600;">{{ entry.employee['name'] }}</td>
+          <td style="color: var(--text-muted);">{{ entry.employee['department'] }}</td>
+          <td style="color: var(--text-muted);">{{ entry.employee['role'] }}</td>
+          <td>
+            <select name="status_{{ entry.employee['id'] }}" class="filter-select attendance-select" data-emp-id="{{ entry.employee['id'] }}" {% if not is_staff and selected_date != today %}disabled{% endif %}>
+              {% for status in statuses %}
+              <option value="{{ status }}" {% if status == entry.status %}selected{% endif %}>{{ status }}</option>
+              {% endfor %}
+            </select>
+            <span class="attendance-save-note" data-emp-id="{{ entry.employee['id'] }}" style="font-size: 11px; color: var(--accent-green, #3fb950); margin-left: 8px; opacity: 0; transition: opacity 0.2s ease;">Saved ✓</span>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4" style="color: var(--text-muted);">No employees yet — add one to get started.</td>
+        </tr>
+        {% endfor %}
+        <tr id="attendance-no-match-row" style="display: none;">
+          <td colspan="4" style="color: var(--text-muted);">No employees match this filter.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  {% if roster and (is_staff or selected_date == today) %}
+  <div style="margin-top: 16px;">
+    <button type="submit" class="btn btn-primary">Save Attendance</button>
+  </div>
+  {% endif %}
+</form>
+
+<script>
+  (function () {
+    var statRow = document.getElementById("attendance-stat-row");
+    var note = document.getElementById("attendance-filter-note");
+    var label = document.getElementById("attendance-filter-label");
+    var clearLink = document.getElementById("attendance-filter-clear");
+    var rows = document.querySelectorAll("table tbody tr[data-status]");
+    var noMatchRow = document.getElementById("attendance-no-match-row");
+    var cards = statRow.querySelectorAll(".stat-card-clickable");
+    var activeStatus = null;
+
+    function applyFilter() {
+      var visibleCount = 0;
+      rows.forEach(function (row) {
+        var show = (!activeStatus || row.getAttribute("data-status") === activeStatus);
+        row.style.display = show ? "" : "none";
+        if (show) { visibleCount++; }
+      });
+      cards.forEach(function (card) {
+        card.classList.toggle("stat-card-active", card.getAttribute("data-status") === activeStatus);
+      });
+      if (activeStatus) {
+        note.style.display = "";
+        label.textContent = activeStatus;
+      } else {
+        note.style.display = "none";
+      }
+      if (noMatchRow) {
+        noMatchRow.style.display = (activeStatus && rows.length && visibleCount === 0) ? "" : "none";
+      }
+    }
+
+    function setStatus(status) {
+      activeStatus = (activeStatus === status) ? null : status;
+      applyFilter();
+    }
+
+    cards.forEach(function (card) {
+      card.addEventListener("click", function () {
+        setStatus(card.getAttribute("data-status"));
+      });
+      card.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setStatus(card.getAttribute("data-status"));
+        }
+      });
+    });
+
+    clearLink.addEventListener("click", function (e) {
+      e.preventDefault();
+      activeStatus = null;
+      applyFilter();
+    });
+
+    // Auto-apply filter when arriving via a link like /attendance?filter=Absent
+    var urlFilter = new URLSearchParams(window.location.search).get("filter");
+    if (urlFilter) {
+      setStatus(urlFilter);
+    }
+  })();
+</script>
+
+<script>
+  (function () {
+    var selects = document.querySelectorAll(".attendance-select");
+    var selectedDate = {{ selected_date|tojson }};
+
+    function updateSummaryCards() {
+      var counts = {};
+      document.querySelectorAll("table tbody tr[data-status]").forEach(function (row) {
+        var s = row.getAttribute("data-status");
+        counts[s] = (counts[s] || 0) + 1;
+      });
+      document.querySelectorAll(".stat-card-clickable").forEach(function (card) {
+        var status = card.getAttribute("data-status");
+        var valueEl = card.querySelector(".stat-value");
+        if (valueEl) { valueEl.textContent = counts[status] || 0; }
+      });
+    }
+
+    selects.forEach(function (select) {
+      select.addEventListener("change", function () {
+        var empId = select.getAttribute("data-emp-id");
+        var status = select.value;
+        var row = select.closest("tr");
+        var note = document.querySelector('.attendance-save-note[data-emp-id="' + empId + '"]');
+
+        select.disabled = true;
+
+        fetch("/attendance/update/" + empId, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: selectedDate, status: status }),
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            select.disabled = false;
+            if (data.ok) {
+              if (row) { row.setAttribute("data-status", status); }
+              updateSummaryCards();
+              if (note) {
+                note.style.opacity = "1";
+                setTimeout(function () { note.style.opacity = "0"; }, 1500);
+              }
+            }
+          })
+          .catch(function () {
+            select.disabled = false;
+          });
+      });
+    });
+  })();
+</script>
+
+{% endblock %}

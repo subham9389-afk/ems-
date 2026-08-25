@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <title>Login</title>
+</head>
+<body>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="wip-banner" style="max-width: 340px; margin: 12px auto 0;">⚠ {{ messages[0] }}</div>
+    {% endif %}
+  {% endwith %}
+
+  <div class="login-wrap">
+    <form method="post" action="{{ url_for('login') }}" class="card login-card">
+      <div class="brand-name" style="color: var(--text);">Sign in</div>
+      <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">
+        Sign into manage employees
+      </p>
+
+      <div class="field" style="margin-bottom: 14px;">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required />
+      </div>
+
+      <div class="field" style="margin-bottom: 18px;">
+        <label for="password">Password</label>
+        <div class="password-wrap">
+          <input type="password" id="password" name="password" required />
+          <button type="button" class="password-toggle" id="passwordToggle" aria-label="Show password" onclick="togglePassword()">
+            <svg id="eyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width: 100%;">Sign in</button>
+
+      <p style="font-size: 12px; color: var(--text-muted); margin-top: 14px; text-align: center;">
+        <a href="{{ url_for('forgot_password') }}" style="color: var(--primary); font-weight: 600;">Forgot password?</a>
+      </p>
+      <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px; text-align: center;">
+        New here? <a href="{{ url_for('signup') }}" style="color: var(--primary); font-weight: 600;">Create account</a>
+      </p>
+    </form>
+  </div>
+
+  <script>
+    function togglePassword() {
+      const input = document.getElementById('password');
+      const icon = document.getElementById('eyeIcon');
+      const btn = document.getElementById('passwordToggle');
+      const showing = input.type === 'text';
+
+      input.type = showing ? 'password' : 'text';
+      btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+
+      icon.innerHTML = showing
+        ? '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle>'
+        : '<path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.86 21.86 0 0 1 5.06-6.06M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.86 21.86 0 0 1-3.22 4.36M14.12 14.12a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+    }
+  </script>
+
+</body>
+</html>

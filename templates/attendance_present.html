@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Present Today{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Daily</div>
+    <h1>Present Today</h1>
+    <p class="sub">Check-in / check-out for {{ selected_date }}.</p>
+  </div>
+</div>
+
+<form method="get" action="{{ url_for('attendance_present') }}" class="filter-bar" style="margin-bottom: 16px;">
+  <input
+    type="date"
+    name="date"
+    value="{{ selected_date }}"
+    max="{{ today }}"
+    class="search-input"
+    style="max-width: 200px;"
+    onchange="this.form.submit()"
+  />
+  {% if selected_date != today %}
+  <a href="{{ url_for('attendance_present', date=today) }}" class="btn btn-ghost btn-sm">Jump to today</a>
+  {% endif %}
+  <a href="{{ url_for('attendance', date=selected_date) }}" class="btn btn-ghost btn-sm">Go to Total Attendance</a>
+</form>
+
+<div class="card" style="padding: 0;">
+  <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px;">
+    {{ rows|length }} present
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Department</th>
+        <th>Designation</th>
+        <th>Check-in</th>
+        <th>Check-out</th>
+        {% if is_staff or true %}
+        <th></th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td style="font-weight: 600;">{{ r['name'] }}</td>
+        <td style="color: var(--text-muted);">{{ r['department'] }}</td>
+        <td style="color: var(--text-muted);">{{ r['role'] }}</td>
+        <td>{{ r['check_in'] or '—' }}</td>
+        <td>{{ r['check_out'] or '—' }}</td>
+        <td>
+          {% if not r['check_out'] %}
+          <form method="post" action="{{ url_for('attendance_checkout', emp_id=r['id']) }}">
+            <input type="hidden" name="date" value="{{ selected_date }}" />
+            <button type="submit" class="btn btn-ghost btn-sm">Mark check-out</button>
+          </form>
+          {% else %}
+          <span style="color: var(--text-muted); font-size: 12px;">Done</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" style="color: var(--text-muted);">No one has been marked present for this date yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

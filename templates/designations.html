@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Designations{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Organization</div>
+    <h1>Designations</h1>
+    <p class="sub">{{ designations|length }} designation{{ 's' if designations|length != 1 else '' }}</p>
+  </div>
+  <form method="post" action="{{ url_for('designations') }}" style="display: flex; gap: 10px; align-items: center;">
+    <input
+      class="search-input"
+      type="text"
+      name="name"
+      placeholder="New designation name…"
+      required
+    />
+    <select name="department" class="filter-select" required>
+      <option value="" disabled selected>Department…</option>
+      {% for dept in departments %}
+      <option value="{{ dept }}">{{ dept }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm">+ Add Designation</button>
+  </form>
+</div>
+
+<div class="card" style="padding: 0; margin-top: 16px;">
+  <div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Designation</th>
+        <th>Department</th>
+        <th>Employees</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in designations %}
+      <tr>
+        <td style="font-weight: 600;">{{ d.name }}</td>
+        <td style="color: var(--text-muted);">{{ d.department or 'All departments' }}</td>
+        <td style="color: var(--text-muted);">{{ d.count }}</td>
+        <td>
+          <div class="row-actions">
+            <a href="{{ url_for('employee_list', q=d.name) }}" class="btn btn-ghost btn-sm">View employees</a>
+            <form method="post" action="{{ url_for('delete_designation', des_id=d.id) }}"
+                  onsubmit="return confirm('Delete {{ d.name }}?');">
+              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4" style="color: var(--text-muted);">No designations yet — add one above.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% endblock %}

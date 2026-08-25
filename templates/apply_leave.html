@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Apply for Leave{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Leave</div>
+    <h1>Apply for Leave</h1>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('apply_leave') }}" class="card form-card form-card--wide">
+  <div class="form-row">
+    {% if is_staff %}
+    <div class="field">
+      <label for="employee_id">Employee</label>
+      <select id="employee_id" name="employee_id" required>
+        <option value="" disabled {{ 'selected' if not form.get('employee_id') else '' }}>Select employee…</option>
+        {% for e in employees %}
+        <option value="{{ e['id'] }}" {{ 'selected' if form.get('employee_id')|string == e['id']|string else '' }}>{{ e['name'] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <div class="field">
+      <label for="leave_type">Leave type</label>
+      <select id="leave_type" name="leave_type" required>
+        <option value="" disabled {{ 'selected' if not form.get('leave_type') else '' }}>Select type…</option>
+        {% for t in leave_types %}
+        <option value="{{ t }}" {{ 'selected' if form.get('leave_type') == t else '' }}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="field">
+      <label for="start_date">Start date</label>
+      <input type="date" id="start_date" name="start_date" value="{{ form.get('start_date', '') }}" required />
+    </div>
+
+    <div class="field">
+      <label for="end_date">End date</label>
+      <input type="date" id="end_date" name="end_date" value="{{ form.get('end_date', '') }}" required />
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="reason">Reason</label>
+    <input type="text" id="reason" name="reason" value="{{ form.get('reason', '') }}" placeholder="Optional" />
+  </div>
+
+  <button type="submit" class="btn btn-primary" style="align-self: flex-start;">Submit Request</button>
+</form>
+
+{% endblock %}

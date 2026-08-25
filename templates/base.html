@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <title>{% block title %}Employees{% endblock %}</title>
+  <script>
+    // Applied before paint so there's no theme flash on load.
+    (function () {
+      var saved = localStorage.getItem('theme'); // 'dark' | 'light' | 'system' | null
+      var wantsDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (wantsDark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-name">Employees</div>
+        <div class="brand-sub">Employee Management</div>
+      </div>
+      <nav>
+        <a href="{{ url_for('dashboard') }}" class="nav-link {{ 'active' if request.endpoint == 'dashboard' else '' }}">▤ Dashboard</a>
+
+        {% if current_role in ['Admin', 'HR', 'HR Manager'] %}
+        {% set employee_open = request.endpoint in ['employee_list', 'add_employee', 'signup_requests', 'signup_request_detail'] %}
+        <button
+          type="button"
+          class="nav-link nav-toggle {{ 'active' if employee_open else '' }}"
+          aria-expanded="{{ 'true' if employee_open else 'false' }}"
+          onclick="document.getElementById('employee-submenu').classList.toggle('open'); this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');"
+        >
+          <span class="nav-toggle-label">☰ Employee{% if current_role == 'Admin' and pending_signup_count %}<span class="badge" style="margin-left: 6px;">{{ pending_signup_count }}</span>{% endif %}</span>
+          <span class="nav-caret">▾</span>
+        </button>
+        <div id="employee-submenu" class="nav-submenu {{ 'open' if employee_open else '' }}">
+          <a href="{{ url_for('employee_list') }}" class="nav-sublink {{ 'active' if request.endpoint == 'employee_list' else '' }}">All Employees</a>
+          <a href="{{ url_for('add_employee') }}" class="nav-sublink {{ 'active' if request.endpoint == 'add_employee' else '' }}">＋ Add Employee</a>
+          {% if current_role == 'Admin' %}
+          <a href="{{ url_for('signup_requests') }}" class="nav-sublink {{ 'active' if request.endpoint in ['signup_requests', 'signup_request_detail'] else '' }}">
+            Signup Requests
+            {% if pending_signup_count %}<span class="badge" style="margin-left: 6px;">{{ pending_signup_count }}</span>{% endif %}
+          </a>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if current_role in ['Admin', 'HR Manager'] %}
+        <a href="{{ url_for('departments') }}" class="nav-link {{ 'active' if request.endpoint == 'departments' else '' }}">▥ Departments</a>
+        <a href="{{ url_for('designations') }}" class="nav-link {{ 'active' if request.endpoint == 'designations' else '' }}">◆ Designations</a>
+        {% endif %}
+
+        {% set attendance_open = request.endpoint in ['attendance', 'attendance_present'] %}
+        <button
+          type="button"
+          class="nav-link nav-toggle {{ 'active' if attendance_open else '' }}"
+          aria-expanded="{{ 'true' if attendance_open else 'false' }}"
+          onclick="document.getElementById('attendance-submenu').classList.toggle('open'); this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');"
+        >
+          <span class="nav-toggle-label">✓ Attendance</span>
+          <span class="nav-caret">▾</span>
+        </button>
+        <div id="attendance-submenu" class="nav-submenu {{ 'open' if attendance_open else '' }}">
+          <a href="{{ url_for('attendance') }}" class="nav-sublink {{ 'active' if request.endpoint == 'attendance' else '' }}">Total Attendance</a>
+          <a href="{{ url_for('attendance_present') }}" class="nav-sublink {{ 'active' if request.endpoint == 'attendance_present' else '' }}">Present Today</a>
+        </div>
+
+        {% set leave_open = request.endpoint in ['leave_list', 'apply_leave'] %}
+        <button
+          type="button"
+          class="nav-link nav-toggle {{ 'active' if leave_open else '' }}"
+          aria-expanded="{{ 'true' if leave_open else 'false' }}"
+          onclick="document.getElementById('leave-submenu').classList.toggle('open'); this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');"
+        >
+          <span class="nav-toggle-label">☂ Leave{% if current_role in ['Admin', 'HR Manager'] and pending_leave_count %}<span class="badge" style="margin-left: 6px;">{{ pending_leave_count }}</span>{% endif %}</span>
+          <span class="nav-caret">▾</span>
+        </button>
+        <div id="leave-submenu" class="nav-submenu {{ 'open' if leave_open else '' }}">
+          <a href="{{ url_for('leave_list') }}" class="nav-sublink {{ 'active' if request.endpoint == 'leave_list' else '' }}">
+            {{ 'All Requests' if current_role in ['Admin', 'HR Manager'] else 'My Requests' }}
+            {% if current_role in ['Admin', 'HR Manager'] and pending_leave_count %}<span class="badge" style="margin-left: 6px;">{{ pending_leave_count }}</span>{% endif %}
+          </a>
+          <a href="{{ url_for('apply_leave') }}" class="nav-sublink {{ 'active' if request.endpoint == 'apply_leave' else '' }}">＋ Apply for Leave</a>
+        </div>
+
+        {% if current_role in ['Admin', 'HR Manager'] %}
+        {% set reports_open = request.endpoint in ['reports', 'edit_reports'] %}
+        <button
+          type="button"
+          class="nav-link nav-toggle {{ 'active' if reports_open else '' }}"
+          aria-expanded="{{ 'true' if reports_open else 'false' }}"
+          onclick="document.getElementById('reports-submenu').classList.toggle('open'); this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');"
+        >
+          <span class="nav-toggle-label">▦ Reports</span>
+          <span class="nav-caret">▾</span>
+        </button>
+        <div id="reports-submenu" class="nav-submenu {{ 'open' if reports_open else '' }}">
+          <a href="{{ url_for('reports') }}" class="nav-sublink {{ 'active' if request.endpoint == 'reports' else '' }}">All Reports</a>
+          {% if current_role == 'Admin' %}
+          <a href="{{ url_for('edit_reports') }}" class="nav-sublink {{ 'active' if request.endpoint == 'edit_reports' else '' }}">Edit Reports</a>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% set announcements_open = request.endpoint in ['announcements', 'post_announcement', 'edit_announcement'] %}
+        <button
+          type="button"
+          class="nav-link nav-toggle {{ 'active' if announcements_open else '' }}"
+          aria-expanded="{{ 'true' if announcements_open else 'false' }}"
+          onclick="document.getElementById('announcements-submenu').classList.toggle('open'); this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');"
+        >
+          <span class="nav-toggle-label">📢 Announcements{% if announcement_count %}<span class="badge" style="margin-left: 6px;">{{ announcement_count if announcement_count < 100 else '99+' }}</span>{% endif %}</span>
+          <span class="nav-caret">▾</span>
+        </button>
+        <div id="announcements-submenu" class="nav-submenu {{ 'open' if announcements_open else '' }}">
+          <a href="{{ url_for('announcements') }}" class="nav-sublink {{ 'active' if request.endpoint == 'announcements' else '' }}">
+            All Announcements
+            {% if announcement_count %}<span class="badge" style="margin-left: 6px;">{{ announcement_count if announcement_count < 100 else '99+' }}</span>{% endif %}
+          </a>
+          {% if current_role in ['Admin', 'HR', 'HR Manager'] %}
+          <a href="{{ url_for('post_announcement') }}" class="nav-sublink {{ 'active' if request.endpoint == 'post_announcement' else '' }}">＋ Post Announcement</a>
+          {% endif %}
+        </div>
+
+        {% if session.get('logged_in') %}
+        {% set settings_open = request.endpoint in ['change_password', 'privacy', 'app_theme', 'audit_logs', 'settings_index', 'view_profile'] %}
+        <a href="{{ url_for('settings_index') }}" class="nav-link {{ 'active' if settings_open else '' }}">
+          <span class="nav-toggle-label">⚙ Settings</span>
+        </a>
+        {% endif %}
+      </nav>
+    </aside>
+
+    <div class="main-area">
+      <header class="navbar">
+        <div style="display: flex; align-items: center;">
+          <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+            <span></span><span></span><span></span>
+          </button>
+          <div class="navbar-org">R S Pvt. Ltd. <span>/</span> ...</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 14px;">
+          {% if session.get('logged_in') %}
+            <span style="font-size: 13px; color: var(--text-muted);">
+              {{ current_username }} <span class="badge" style="margin-left: 4px;">{{ current_role }}</span>
+            </span>
+            <a href="{{ url_for('announcements') }}" title="Announcements" style="position: relative; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2, var(--surface)); border: 1px solid var(--border); text-decoration: none; font-size: 16px;">
+              📢
+              {% if announcement_count %}
+              <span style="position: absolute; top: -4px; right: -4px; background: var(--accent-red, #e5534b); color: #fff; font-size: 10px; line-height: 1; font-weight: 700; padding: 3px 5px; border-radius: 999px; min-width: 16px; text-align: center;">{{ announcement_count if announcement_count < 100 else '99+' }}</span>
+              {% endif %}
+            </a>
+            <a href="{{ url_for('privacy') }}" title="{{ current_username }}" style="display: flex; align-items: center;">
+              <div class="avatar-circle" style="width: 34px; height: 34px;">
+                {% if current_photo %}
+                  <img src="{{ url_for('static', filename=current_photo) }}" alt="{{ current_username }}" />
+                {% else %}
+                  <span class="avatar-initial" style="font-size: 14px;">{{ current_username[0]|upper if current_username else '?' }}</span>
+                {% endif %}
+              </div>
+            </a>
+          {% else %}
+            <a href="{{ url_for('login') }}" class="navbar-login">Login</a>
+          {% endif %}
+        </div>
+      </header>
+
+      <div class="page">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="wip-banner">⚠ {{ messages[0] }}</div>
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var toggle = document.getElementById('sidebarToggle');
+      var shell = document.querySelector('.app-shell');
+      if (!toggle || !shell) return;
+
+      function isMobile() {
+        return window.matchMedia('(max-width: 860px)').matches;
+      }
+
+      // Desktop: restore the persisted collapsed/expanded preference.
+      // (Unchanged from before — mobile ignores this and always starts closed.)
+      if (!isMobile() && localStorage.getItem('sidebarCollapsed') === 'true') {
+        shell.classList.add('sidebar-collapsed');
+      }
+
+      toggle.addEventListener('click', function () {
+        if (isMobile()) {
+          shell.classList.toggle('mobile-nav-open');
+        } else {
+          shell.classList.toggle('sidebar-collapsed');
+          localStorage.setItem('sidebarCollapsed', shell.classList.contains('sidebar-collapsed'));
+        }
+      });
+
+      // Tapping the dimmed backdrop (anywhere outside the open drawer) closes it.
+      shell.addEventListener('click', function (e) {
+        if (
+          isMobile() &&
+          shell.classList.contains('mobile-nav-open') &&
+          !e.target.closest('.sidebar') &&
+          !e.target.closest('#sidebarToggle')
+        ) {
+          shell.classList.remove('mobile-nav-open');
+        }
+      });
+    })();
+  </script>
+
+  <script>
+    // Two-finger swipe navigation: right swipe -> next menu option, left swipe -> previous option
+    // Handles BOTH real touchscreens (touch events) AND laptop/desktop trackpads
+    // (which send 'wheel' events with deltaX for a 2-finger horizontal swipe, not touch events).
+    (function () {
+      // Collect all navigable menu links (top-level + submenu links) in the order they appear.
+      var navLinks = Array.prototype.slice.call(
+        document.querySelectorAll('.sidebar a.nav-link, .sidebar a.nav-sublink')
+      );
+      if (navLinks.length === 0) return;
+
+      var currentIndex = navLinks.findIndex(function (el) {
+        return el.classList.contains('active');
+      });
+
+      if (currentIndex === -1) return; // current page isn't part of the nav list
+
+      var SWIPE_THRESHOLD = 60;      // minimum horizontal distance (px)
+      var SWIPE_RESTRAINT = 75;      // maximum vertical drift allowed (px)
+
+      var target = document.querySelector('.main-area') || document.body;
+
+      function goTo(direction) {
+        // direction: 1 = forward (next), -1 = backward (previous)
+        var nextIndex = currentIndex + direction;
+        if (nextIndex >= 0 && nextIndex < navLinks.length) {
+          window.location.href = navLinks[nextIndex].href;
+        }
+      }
+
+      // ---------- 1) REAL TOUCHSCREEN: two-finger touch swipe ----------
+      var touchStartX = 0, touchStartY = 0, touchEndX = 0, touchEndY = 0;
+      var isTwoFingerGesture = false;
+
+      function averagePoint(touches) {
+        var x = 0, y = 0;
+        for (var i = 0; i < touches.length; i++) {
+          x += touches[i].clientX;
+          y += touches[i].clientY;
+        }
+        return { x: x / touches.length, y: y / touches.length };
+      }
+
+      target.addEventListener('touchstart', function (e) {
+        if (e.touches.length === 2) {
+          isTwoFingerGesture = true;
+          var p = averagePoint(e.touches);
+          touchStartX = p.x;
+          touchStartY = p.y;
+          touchEndX = p.x;
+          touchEndY = p.y;
+        } else {
+          isTwoFingerGesture = false;
+        }
+      }, { passive: true });
+
+      target.addEventListener('touchmove', function (e) {
+        if (isTwoFingerGesture && e.touches.length === 2) {
+          var p = averagePoint(e.touches);
+          touchEndX = p.x;
+          touchEndY = p.y;
+        }
+      }, { passive: true });
+
+      target.addEventListener('touchend', function (e) {
+        if (!isTwoFingerGesture) return;
+        if (e.touches.length === 0) {
+          var deltaX = touchEndX - touchStartX;
+          var deltaY = touchEndY - touchStartY;
+          isTwoFingerGesture = false;
+          if (Math.abs(deltaX) >= SWIPE_THRESHOLD && Math.abs(deltaY) <= SWIPE_RESTRAINT) {
+            goTo(deltaX > 0 ? 1 : -1);
+          }
+        }
+      }, { passive: true });
+
+      // ---------- 2) LAPTOP / DESKTOP TRACKPAD: two-finger swipe (wheel event) ----------
+      var wheelAccumX = 0;
+      var wheelCooldown = false;
+      var wheelResetTimer = null;
+      var WHEEL_THRESHOLD = 50;
+
+      target.addEventListener('wheel', function (e) {
+        // Only treat it as a swipe if the movement is mostly horizontal
+        // (a normal vertical mouse-wheel scroll has deltaY dominant, so it's ignored)
+        if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+        if (wheelCooldown) return;
+
+        wheelAccumX += e.deltaX;
+
+        clearTimeout(wheelResetTimer);
+        wheelResetTimer = setTimeout(function () {
+          wheelAccumX = 0;
+        }, 200);
+
+        if (Math.abs(wheelAccumX) >= WHEEL_THRESHOLD) {
+          // Positive deltaX = content scrolls right = fingers swiped left; negative = swiped right
+          var direction = wheelAccumX > 0 ? 1 : -1;
+          wheelAccumX = 0;
+          wheelCooldown = true;
+          goTo(direction);
+          setTimeout(function () { wheelCooldown = false; }, 700); // avoid double-trigger while page navigates
+        }
+      }, { passive: true });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Insights</div>
+    <h1>Reports</h1>
+    <p class="sub">Snapshot for {{ month_label }}.</p>
+  </div>
+  {% if current_role == 'Admin' %}
+  <a href="{{ url_for('edit_reports') }}" class="btn btn-ghost btn-sm">✎ Edit Reports</a>
+  {% endif %}
+</div>
+
+{% if report_notes %}
+<div class="card" style="padding: 16px 20px; margin-bottom: 20px; border-left: 3px solid var(--primary);">
+  <div class="stat-label" style="margin-bottom: 6px;">Note</div>
+  <p style="font-size: 14px; white-space: pre-wrap;">{{ report_notes }}</p>
+  {% if report_notes_updated_by %}
+  <p style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">— {{ report_notes_updated_by }}, {{ report_notes_updated_at }}</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="stat-row">
+  <div class="card stat-card">
+    <div class="stat-corner" style="background: var(--primary);"></div>
+    <div class="stat-label">Total Monthly Payroll</div>
+    <div class="stat-value">₹{{ "{:,.0f}".format(total_salary) }}</div>
+  </div>
+  {% for row in leave_summary %}
+  <div class="card stat-card">
+    <div class="stat-corner" style="background: var(--accent-amber);"></div>
+    <div class="stat-label">{{ row['status'] }} Leaves</div>
+    <div class="stat-value">{{ row['count'] }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card" style="padding: 0; margin-bottom: 20px;">
+  <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px;">
+    Department Strength
+  </div>
+  <table>
+    <thead><tr><th>Department</th><th>Headcount</th></tr></thead>
+    <tbody>
+      {% for row in dept_strength %}
+      <tr><td>{{ row['department'] }}</td><td>{{ row['count'] }}</td></tr>
+      {% else %}
+      <tr><td colspan="2" style="color: var(--text-muted);">No data.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card" style="padding: 0; margin-bottom: 20px;">
+  <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px;">
+    Employee Status Breakdown
+  </div>
+  <table>
+    <thead><tr><th>Status</th><th>Count</th></tr></thead>
+    <tbody>
+      {% for row in status_breakdown %}
+      <tr><td>{{ row['status'] }}</td><td>{{ row['count'] }}</td></tr>
+      {% else %}
+      <tr><td colspan="2" style="color: var(--text-muted);">No data.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card" style="padding: 0; margin-bottom: 20px;">
+  <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px;">
+    Approved Leave by Type
+  </div>
+  <table>
+    <thead><tr><th>Leave Type</th><th>Count</th></tr></thead>
+    <tbody>
+      {% for row in leave_by_type %}
+      <tr><td>{{ row['leave_type'] }}</td><td>{{ row['count'] }}</td></tr>
+      {% else %}
+      <tr><td colspan="2" style="color: var(--text-muted);">No approved leave yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card" style="padding: 0;">
+  <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px;">
+    Attendance This Month
+  </div>
+  <div style="overflow-x: auto;">
+  <table>
+    <thead><tr><th>Name</th><th>Department</th><th>Present Days</th><th>Days Marked</th></tr></thead>
+    <tbody>
+      {% for row in attendance_this_month %}
+      <tr>
+        <td style="font-weight: 600;">{{ row['name'] }}</td>
+        <td style="color: var(--text-muted);">{{ row['department'] }}</td>
+        <td>{{ row['present_days'] or 0 }}</td>
+        <td style="color: var(--text-muted);">{{ row['marked_days'] or 0 }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" style="color: var(--text-muted);">No data.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% endblock %}

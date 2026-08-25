@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, avatar %}
+{% block title %}Employees{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Directory</div>
+    <h1>Employees</h1>
+    <p class="sub">
+      {{ employees|length }} shown
+      {% if status %} — Status: {{ status }}{% endif %}
+      {% if new_this_month %} — New this month{% endif %}
+    </p>
+  </div>
+  <a href="{{ url_for('add_employee') }}" class="btn btn-primary">+ Add Employee</a>
+</div>
+
+<div class="filter-bar" style="margin-bottom: 16px; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+  <form method="get" action="{{ url_for('employee_list') }}" id="filterForm" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: nowrap; flex: 1 1 380px; min-width: 0;">
+    <input
+      class="search-input"
+      type="text"
+      name="q"
+      value="{{ q }}"
+      placeholder="🔍 Live search by name, department, or role…"
+      style="width: auto; flex: 1 1 160px; min-width: 100px; max-width: 360px;"
+      id="liveSearchInput"
+    />
+    <div class="sortby" id="sortByDropdown">
+      <button type="button" class="filter-select sortby-trigger" id="sortByTrigger">
+        <span id="sortByTriggerLabel">Sort by…</span>
+        <span class="nav-caret">▾</span>
+      </button>
+      <div class="sortby-panel" id="sortByPanel">
+
+        <div class="sortby-group">
+          <div class="sortby-group-label">Name <span class="sortby-flyout-arrow">▸</span></div>
+          <div class="sortby-options">
+            <button type="button" class="sortby-option" data-value="name_asc" data-label="Name: A to Z">A to Z</button>
+            <button type="button" class="sortby-option" data-value="name_desc" data-label="Name: Z to A">Z to A</button>
+          </div>
+        </div>
+
+        <div class="sortby-group">
+          <div class="sortby-group-label">Joining Date <span class="sortby-flyout-arrow">▸</span></div>
+          <div class="sortby-options">
+            <button type="button" class="sortby-option" data-value="join_date_asc" data-label="Joining Date: Oldest first">Oldest first</button>
+            <button type="button" class="sortby-option" data-value="join_date_desc" data-label="Joining Date: Newest first">Newest first</button>
+          </div>
+        </div>
+
+        <div class="sortby-group">
+          <div class="sortby-group-label">Department <span class="sortby-flyout-arrow">▸</span></div>
+          <div class="sortby-options">
+            {% for dept in departments %}
+            <button type="button" class="sortby-option" data-value="dept:{{ dept }}" data-label="Department: {{ dept }}">{{ dept }}</button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="sortby-group">
+          <div class="sortby-group-label">Status <span class="sortby-flyout-arrow">▸</span></div>
+          <div class="sortby-options">
+            <button type="button" class="sortby-option" data-value="status:" data-label="Status: All statuses">All statuses</button>
+            <button type="button" class="sortby-option" data-value="status:Active" data-label="Status: Active">Active</button>
+            <button type="button" class="sortby-option" data-value="status:On Leave" data-label="Status: On Leave">On Leave</button>
+          </div>
+        </div>
+
+      </div>
+      <input type="hidden" name="sort_filter" id="sortFilterInput" value="{{ sort_filter }}" />
+    </div>
+    </div>
+    {% if q or sort_filter or status or department or new_this_month %}
+    <a href="{{ url_for('employee_list') }}" class="btn btn-ghost btn-sm">Clear</a>
+    {% endif %}
+  </form>
+
+  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+    <a href="{{ url_for('export_employees', q=q, department=department, status=status) }}" class="btn btn-ghost btn-sm">⬇ Export CSV</a>
+    <form method="post" action="{{ url_for('import_employees') }}" enctype="multipart/form-data" style="display: flex; gap: 8px; align-items: center;">
+      <input type="file" name="csv_file" accept=".csv" required class="file-input" />
+      <button type="submit" class="btn btn-primary btn-sm">Import CSV</button>
+    </form>
+  </div>
+</div>
+
+<div class="card" style="padding: 0;">
+  <div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Reg. No.</th>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Department</th>
+        <th>Designation</th>
+        <th>Salary</th>
+        <th>Status</th>
+        <th>Joined</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in employees %}
+      <tr>
+        <td style="color: var(--text-muted);">{{ e['registration_no'] or '—' }}</td>
+        <td style="font-weight: 600;">
+          <div class="name-cell">
+            {{ avatar(e['name']) }}
+            {{ e['name'] }}
+          </div>
+        </td>
+        <td style="color: var(--text-muted);">{{ e['email'] }}</td>
+        <td>{{ e['department'] }}</td>
+        <td>{{ e['role'] }}</td>
+        <td style="color: var(--text-muted);">{{ '₹{:,.0f}'.format(e['salary']) if e['salary'] is not none else '—' }}</td>
+        <td>{{ status_badge(e['status']) }}</td>
+        <td style="color: var(--text-muted);">{{ e['join_date'] }}</td>
+        <td>
+          <div class="row-actions">
+            <a href="{{ url_for('employee_detail', emp_id=e['id']) }}" class="btn btn-ghost btn-sm">View</a>
+            <a href="{{ url_for('edit_employee', emp_id=e['id']) }}" class="btn btn-primary btn-sm">Edit</a>
+            <form method="post" action="{{ url_for('delete_employee', emp_id=e['id']) }}"
+                  onsubmit="return confirm('Delete {{ e.name }}? This cannot be undone.');">
+              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="9" style="color: var(--text-muted);">No matches.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<script>
+  // Live search: auto-submits the filter form shortly after the user stops typing,
+  // so results update without needing to press Enter.
+  (function () {
+    var input = document.getElementById('liveSearchInput');
+    var form = document.getElementById('filterForm');
+    if (!input || !form) return;
+    var timer = null;
+    input.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () { form.submit(); }, 450);
+    });
+  })();
+</script>
+
+<script>
+  // Custom "Sort by" dropdown: clicking the trigger reveals only the 4
+  // category rows (Name / Joining Date / Department / Status). Hovering the
+  // mouse over a category (no click needed) highlights it and flies out its
+  // options to the side.
+  (function () {
+    var dropdown = document.getElementById('sortByDropdown');
+    var trigger = document.getElementById('sortByTrigger');
+    var triggerLabel = document.getElementById('sortByTriggerLabel');
+    var panel = document.getElementById('sortByPanel');
+    var hiddenInput = document.getElementById('sortFilterInput');
+    var form = document.getElementById('filterForm');
+    if (!dropdown || !trigger || !panel || !hiddenInput || !form) return;
+
+    var optionButtons = Array.prototype.slice.call(dropdown.querySelectorAll('.sortby-option'));
+
+    function closePanel() {
+      panel.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    // Pre-label the trigger based on the current value (from the URL / server).
+    var currentValue = hiddenInput.value;
+    optionButtons.forEach(function (btn) {
+      if (btn.getAttribute('data-value') === currentValue) {
+        btn.classList.add('selected');
+        triggerLabel.textContent = btn.getAttribute('data-label');
+      }
+    });
+
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (panel.classList.contains('open')) {
+        closePanel();
+      } else {
+        panel.classList.add('open');
+        trigger.setAttribute('aria-expanded', 'true');
+      }
+    });
+
+    optionButtons.forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        hiddenInput.value = btn.getAttribute('data-value');
+        form.submit();
+      });
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!dropdown.contains(e.target)) closePanel();
+    });
+  })();
+</script>
+
+{% endblock %}

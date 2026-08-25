@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Edit Employee {% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Directory</div>
+    <h1>Edit Employee</h1>
+    <p class="sub">Update {{ employee['name'] }}'s details.</p>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('edit_employee', emp_id=employee['id']) }}" class="card form-card form-card--wide">
+  <div class="field">
+    <label for="name">Full name</label>
+    <input type="text" id="name" name="name" value="{{ form.get('name', '') }}" required />
+  </div>
+
+  <div class="form-row">
+    <div class="field" style="position: relative;">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" value="{{ form.get('email', '') }}" required autocomplete="off" />
+      <div class="email-suggest" id="emailSuggest"></div>
+    </div>
+
+    <div class="field">
+      <label for="phone">Phone number</label>
+      <input type="tel" id="phone" name="phone" value="{{ form.get('phone', '') }}" placeholder="e.g. 9876543210" maxlength="10" inputmode="numeric" pattern="[0-9]{10}" title="Enter a 10-digit phone number" />
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="field">
+      <label for="department">Department</label>
+      <select id="department" name="department" required>
+        <option value="" disabled {{ 'selected' if not form.get('department') else '' }}>Select department…</option>
+        {% for dept in departments %}
+        <option value="{{ dept }}" {{ 'selected' if form.get('department') == dept else '' }}>{{ dept }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="role">Designation</label>
+      <select id="role" name="role" required>
+        <option value="" disabled {{ 'selected' if not form.get('role') else '' }}>Select designation…</option>
+        {% for r in role_rows %}
+        <option value="{{ r.name }}" data-department="{{ r.department or '' }}" {{ 'selected' if form.get('role') == r.name else '' }}>{{ r.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="field">
+      <label for="salary">Salary</label>
+      <input type="number" step="0.01" min="0" id="salary" name="salary" value="{{ form.get('salary', '') }}" placeholder="e.g. 55000" />
+    </div>
+
+    <div class="field">
+      <label for="hire_date">Hire date</label>
+      <input type="date" id="hire_date" name="hire_date" value="{{ form.get('join_date', '') }}" />
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="field">
+      <label for="experience_years">Experience (years)</label>
+      <input type="number" step="0.1" min="0" id="experience_years" name="experience_years" value="{{ form.get('experience_years', '') }}" placeholder="e.g. 2.5" />
+    </div>
+
+    <div class="field">
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option {{ 'selected' if form.get('status') == 'Active' else '' }}>Active</option>
+        <option {{ 'selected' if form.get('status') == 'On Leave' else '' }}>On Leave</option>
+        <option {{ 'selected' if form.get('status') == 'Resigned' else '' }}>Resigned</option>
+      </select>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 10px;">
+    <button type="submit" class="btn btn-primary" style="align-self: flex-start;">Save Changes</button>
+    <a href="{{ url_for('employee_detail', emp_id=employee['id']) }}" class="btn btn-ghost">Cancel</a>
+  </div>
+</form>
+
+<script>
+  // Phone: digits only, capped at 10.
+  (function () {
+    var phone = document.getElementById('phone');
+    if (!phone) return;
+    phone.addEventListener('input', function () {
+      phone.value = phone.value.replace(/\D/g, '').slice(0, 10);
+    });
+  })();
+
+  // Email: suggest common domains (e.g. auto-complete ".com") as the user types after "@".
+  (function () {
+    var email = document.getElementById('email');
+    var box = document.getElementById('emailSuggest');
+    if (!email || !box) return;
+    var domains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
+
+    function hide() { box.style.display = 'none'; box.innerHTML = ''; }
+
+    function update() {
+      var value = email.value;
+      var at = value.indexOf('@');
+      if (at === -1 || at === value.length - 1 && value.slice(0, at) === '') { hide(); return; }
+      var local = value.slice(0, at);
+      var domainPart = value.slice(at + 1);
+      if (!local || domainPart.indexOf('.') !== -1) { hide(); return; }
+      var matches = domains.filter(function (d) { return d.indexOf(domainPart) === 0; });
+      if (!matches.length) { hide(); return; }
+      box.innerHTML = '';
+      matches.forEach(function (d) {
+        var row = document.createElement('div');
+        row.className = 'email-suggest-option';
+        row.innerHTML = local + '@' + '<strong>' + d + '</strong>';
+        row.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          email.value = local + '@' + d;
+          hide();
+        });
+        box.appendChild(row);
+      });
+      box.style.display = 'block';
+    }
+
+    email.addEventListener('input', update);
+    email.addEventListener('blur', function () { setTimeout(hide, 150); });
+  })();
+</script>
+
+{% endblock %}

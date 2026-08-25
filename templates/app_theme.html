@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}App Theme{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Settings</div>
+    <h1>App Theme</h1>
+    <p class="sub">Choose how the app looks on this device.</p>
+  </div>
+</div>
+
+<div class="card" style="padding: 8px; max-width: 480px;">
+  <div id="theme-options" style="display: flex; flex-direction: column; gap: 4px;">
+    <button type="button" class="theme-option" data-theme-value="system" style="display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px 16px; border-radius: 10px; border: 1px solid transparent; background: none; cursor: pointer; font-family: inherit; color: var(--text);">
+      <span style="font-size: 20px;">🖥️</span>
+      <span style="flex: 1;">
+        <span style="display: block; font-weight: 600; font-size: 14px;">System Default</span>
+        <span style="display: block; font-size: 12px; color: var(--text-muted);">Match your device's setting</span>
+      </span>
+      <span class="theme-check" style="font-size: 16px; color: var(--primary); visibility: hidden;">✓</span>
+    </button>
+
+    <button type="button" class="theme-option" data-theme-value="dark" style="display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px 16px; border-radius: 10px; border: 1px solid transparent; background: none; cursor: pointer; font-family: inherit; color: var(--text);">
+      <span style="font-size: 20px;">🌙</span>
+      <span style="flex: 1;">
+        <span style="display: block; font-weight: 600; font-size: 14px;">Dark Mode</span>
+        <span style="display: block; font-size: 12px; color: var(--text-muted);">Always use the dark theme</span>
+      </span>
+      <span class="theme-check" style="font-size: 16px; color: var(--primary); visibility: hidden;">✓</span>
+    </button>
+
+    <button type="button" class="theme-option" data-theme-value="light" style="display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px 16px; border-radius: 10px; border: 1px solid transparent; background: none; cursor: pointer; font-family: inherit; color: var(--text);">
+      <span style="font-size: 20px;">☀️</span>
+      <span style="flex: 1;">
+        <span style="display: block; font-weight: 600; font-size: 14px;">Light Mode</span>
+        <span style="display: block; font-size: 12px; color: var(--text-muted);">Always use the light theme</span>
+      </span>
+      <span class="theme-check" style="font-size: 16px; color: var(--primary); visibility: hidden;">✓</span>
+    </button>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var options = document.querySelectorAll('.theme-option');
+
+    function currentSaved() {
+      return localStorage.getItem('theme') || 'system';
+    }
+
+    function applyTheme(value) {
+      var wantsDark;
+      if (value === 'dark') {
+        wantsDark = true;
+      } else if (value === 'light') {
+        wantsDark = false;
+      } else {
+        wantsDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+      if (wantsDark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+    }
+
+    function highlight(value) {
+      options.forEach(function (btn) {
+        var isActive = btn.getAttribute('data-theme-value') === value;
+        btn.style.background = isActive ? 'var(--surface-2, var(--surface))' : 'none';
+        btn.style.borderColor = isActive ? 'var(--primary)' : 'transparent';
+        btn.querySelector('.theme-check').style.visibility = isActive ? 'visible' : 'hidden';
+      });
+    }
+
+    highlight(currentSaved());
+
+    options.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var value = btn.getAttribute('data-theme-value');
+        localStorage.setItem('theme', value);
+        applyTheme(value);
+        highlight(value);
+      });
+    });
+  })();
+</script>
+
+{% endblock %}

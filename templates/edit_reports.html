@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Edit Reports{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Insights</div>
+    <h1>Edit Reports</h1>
+    <p class="sub">Add a note or summary that appears at the top of the Reports page.</p>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('edit_reports') }}" class="card form-card form-card--wide">
+  <div class="field">
+    <label for="notes">Report notes</label>
+    <textarea id="notes" name="notes" rows="8" placeholder="e.g. context, caveats, or a summary for this month's numbers…" style="width: 100%; resize: vertical; font-family: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">{{ notes }}</textarea>
+  </div>
+
+  {% if updated_by %}
+  <p style="color: var(--text-muted); font-size: 12px;">Last updated by {{ updated_by }} on {{ updated_at }}</p>
+  {% endif %}
+
+  <div style="display: flex; gap: 10px;">
+    <button type="submit" class="btn btn-primary" style="align-self: flex-start;">Save</button>
+    <a href="{{ url_for('reports') }}" class="btn btn-ghost">Cancel</a>
+  </div>
+</form>
+
+<form method="post" action="{{ url_for('edit_reports') }}" class="card" style="padding: 0; margin-top: 20px;">
+  <input type="hidden" name="save_leaves" value="1" />
+  <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+    <div style="font-weight: 600; font-size: 14px;">Employee Leave &amp; Salary Summary</div>
+    <span style="color: var(--text-muted); font-size: 12px;">Paid / Unpaid / Total leaves are editable</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Employee</th>
+        <th>Department</th>
+        <th>Paid Leaves</th>
+        <th>Unpaid Leaves</th>
+        <th>Total Leaves</th>
+        <th>Salary</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for emp in employee_reports %}
+      <tr>
+        <td style="color: var(--text-muted);">
+          {{ emp.registration_no or emp.id }}
+          <input type="hidden" name="emp_id" value="{{ emp.id }}" />
+        </td>
+        <td>{{ emp.name }}</td>
+        <td>{{ emp.department }}</td>
+        <td>
+          <input
+            type="number"
+            min="0"
+            name="paid_{{ emp.id }}"
+            value="{{ emp.paid_leaves }}"
+            style="width: 70px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);"
+          />
+        </td>
+        <td>
+          <input
+            type="number"
+            min="0"
+            name="unpaid_{{ emp.id }}"
+            value="{{ emp.unpaid_leaves }}"
+            style="width: 70px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);"
+          />
+        </td>
+        <td>
+          <input
+            type="number"
+            min="0"
+            name="total_{{ emp.id }}"
+            value="{{ emp.total_leaves }}"
+            style="width: 70px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);"
+          />
+        </td>
+        <td>₹{{ "{:,.0f}".format(emp.salary) }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" style="color: var(--text-muted);">No employees yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if employee_reports %}
+  <div style="padding: 16px 20px; border-top: 1px solid var(--border);">
+    <button type="submit" class="btn btn-primary">Save Leave &amp; Salary Changes</button>
+  </div>
+  {% endif %}
+</form>
+
+<script>
+  // Keep "Total Leaves" in sync with Paid + Unpaid, unless the user edits Total directly.
+  document.querySelectorAll('input[name^="paid_"], input[name^="unpaid_"]').forEach(function (input) {
+    input.addEventListener('input', function () {
+      var empId = input.name.split('_').slice(1).join('_');
+      var paidInput = document.querySelector('input[name="paid_' + empId + '"]');
+      var unpaidInput = document.querySelector('input[name="unpaid_' + empId + '"]');
+      var totalInput = document.querySelector('input[name="total_' + empId + '"]');
+      if (paidInput && unpaidInput && totalInput) {
+        var paid = parseInt(paidInput.value, 10) || 0;
+        var unpaid = parseInt(unpaidInput.value, 10) || 0;
+        totalInput.value = paid + unpaid;
+      }
+    });
+  });
+</script>
+
+{% endblock %}

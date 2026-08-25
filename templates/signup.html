@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <title>Create Account</title>
+</head>
+<body>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="wip-banner" style="max-width: 480px; margin: 12px auto 0;">⚠ {{ messages[0] }}</div>
+    {% endif %}
+  {% endwith %}
+
+  <div class="login-wrap" style="align-items: flex-start; padding: 40px 16px;">
+    <form method="post" action="{{ url_for('signup') }}" class="card login-card" style="max-width: 480px; width: 100%;">
+      <div class="brand-name" style="color: var(--text);">Create account</div>
+      <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">
+        Fill in your details below. An admin will review your request before your login is created.
+      </p>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="first_name">First name</label>
+          <input type="text" id="first_name" name="first_name" value="{{ form.get('first_name', '') }}" required />
+        </div>
+        <div class="field">
+          <label for="last_name">Last name</label>
+          <input type="text" id="last_name" name="last_name" value="{{ form.get('last_name', '') }}" required />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field" style="position: relative;">
+          <label for="email">Email (Gmail only)</label>
+          <input type="email" id="email" name="email" value="{{ form.get('email', '') }}"
+                 pattern="^[a-zA-Z0-9._%+-]+@gmail\.com$"
+                 title="Please enter a valid @gmail.com address"
+                 placeholder="youremail@gmail.com" autocomplete="off" required />
+          <div class="email-suggest" id="emailSuggest"></div>
+        </div>
+        <div class="field">
+          <label for="phone">Phone number</label>
+          <input type="tel" id="phone" name="phone" value="{{ form.get('phone', '') }}" placeholder="e.g. 9876543210" maxlength="10" inputmode="numeric" pattern="[0-9]{10}" title="Enter a 10-digit phone number" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="department">Department</label>
+          <div class="select-with-add">
+            <select id="department" name="department" class="add-new-select" required>
+              <option value="" disabled {{ 'selected' if not form.get('department') else '' }}>Select department…</option>
+              {% for dept in departments %}
+              <option value="{{ dept }}" {{ 'selected' if form.get('department') == dept else '' }}>{{ dept }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" id="department_add_btn" class="add-new-btn" title="Add new department">＋</button>
+          </div>
+          <div class="add-new-slide" id="department_new_wrap">
+            <input type="text" id="new_department" name="new_department" value="{{ form.get('new_department', '') }}"
+                   placeholder="Enter new department name" />
+            <a href="#" id="department_cancel_new" style="font-size: 12px; color: var(--primary); font-weight: 600;">← Choose from list</a>
+          </div>
+          <input type="hidden" id="department_mode" name="department_mode" value="{{ 'new' if form.get('department_mode') == 'new' else 'existing' }}" />
+        </div>
+        <div class="field">
+          <label for="role">Designation</label>
+          <div class="select-with-add">
+            <select id="role" name="role" class="add-new-select" required>
+              <option value="" disabled {{ 'selected' if not form.get('role') else '' }}>Select designation…</option>
+              {% for r in role_rows %}
+              <option value="{{ r.name }}" data-department="{{ r.department or '' }}" {{ 'selected' if form.get('role') == r.name else '' }}>{{ r.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" id="role_add_btn" class="add-new-btn" title="Add new designation">＋</button>
+          </div>
+          <div class="add-new-slide" id="role_new_wrap">
+            <input type="text" id="new_role" name="new_role" value="{{ form.get('new_role', '') }}"
+                   placeholder="Enter new designation name" />
+            <a href="#" id="role_cancel_new" style="font-size: 12px; color: var(--primary); font-weight: 600;">← Choose from list</a>
+          </div>
+          <input type="hidden" id="role_mode" name="role_mode" value="{{ 'new' if form.get('role_mode') == 'new' else 'existing' }}" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="hire_date">Joining date</label>
+          <input type="date" id="hire_date" name="hire_date" value="{{ form.get('hire_date', '') }}" />
+        </div>
+        <div class="field">
+          <label for="experience_years">Experience (years)</label>
+          <input type="number" step="0.1" min="0" id="experience_years" name="experience_years" value="{{ form.get('experience_years', '') }}" placeholder="e.g. 2.5" />
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom: 14px;">
+        <label for="username">Choose a username</label>
+        <input type="text" id="username" name="username" value="{{ form.get('username', '') }}" required />
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="password-wrap">
+            <input type="password" id="password" name="password" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="confirm_password">Confirm password</label>
+          <div class="password-wrap">
+            <input type="password" id="confirm_password" name="confirm_password" required />
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 6px;">Submit for admin approval</button>
+
+      <p style="font-size: 12px; color: var(--text-muted); margin-top: 14px; text-align: center;">
+        Already have an account? <a href="{{ url_for('login') }}" style="color: var(--primary); font-weight: 600;">Sign in</a>
+      </p>
+    </form>
+  </div>
+
+  <script>
+    (function () {
+      var phone = document.getElementById('phone');
+      if (!phone) return;
+      phone.addEventListener('input', function () {
+        phone.value = phone.value.replace(/\D/g, '').slice(0, 10);
+      });
+    })();
+
+    // While typing the email, show a clickable "gmail.com" suggestion below the
+    // field (same style as the Add Employee form) instead of forcing it into the
+    // text as you type — click the suggestion to accept it.
+    (function () {
+      var email = document.getElementById('email');
+      var box = document.getElementById('emailSuggest');
+      if (!email || !box) return;
+
+      function hide() { box.style.display = 'none'; box.innerHTML = ''; }
+
+      function update() {
+        var value = email.value;
+        var at = value.indexOf('@');
+        var local = at === -1 ? value : value.slice(0, at);
+        var domainPart = at === -1 ? '' : value.slice(at + 1);
+        if (!local || (at !== -1 && 'gmail.com'.indexOf(domainPart) !== 0)) { hide(); return; }
+        if (domainPart === 'gmail.com') { hide(); return; }
+
+        box.innerHTML = '';
+        var row = document.createElement('div');
+        row.className = 'email-suggest-option';
+        row.innerHTML = local + '@' + '<strong>gmail.com</strong>';
+        row.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          email.value = local + '@gmail.com';
+          hide();
+        });
+        box.appendChild(row);
+        box.style.display = 'block';
+      }
+
+      email.addEventListener('input', update);
+      email.addEventListener('blur', function () { setTimeout(hide, 150); });
+    })();
+
+    // Designation dropdown: only show designations that belong to the selected
+    // department (an option with no data-department shows under every department).
+    (function () {
+      var deptSelect = document.getElementById('department');
+      var roleSelect = document.getElementById('role');
+      if (!deptSelect || !roleSelect) return;
+      var roleOptions = Array.prototype.slice.call(roleSelect.options);
+
+      function filterRoles() {
+        var dept = deptSelect.value;
+        var currentValue = roleSelect.value;
+        var currentStillValid = false;
+
+        roleOptions.forEach(function (opt) {
+          if (!opt.value) return; // keep the placeholder option as-is
+          var optDept = opt.getAttribute('data-department') || '';
+          var matches = !dept || !optDept || optDept === dept;
+          opt.hidden = !matches;
+          opt.disabled = !matches;
+          if (matches && opt.value === currentValue) currentStillValid = true;
+        });
+
+        if (!currentStillValid) {
+          roleSelect.value = '';
+        }
+      }
+
+      deptSelect.addEventListener('change', filterRoles);
+      filterRoles();
+    })();
+
+    // "+ Add new department / designation" -> a dedicated ＋ button slides the
+    // text field in (in the exact same spot as the dropdown), with a link back.
+    (function () {
+      function wireAddNew(selectId, wrapId, inputId, cancelId, btnId, modeId, onActivate) {
+        var select = document.getElementById(selectId);
+        var wrap = document.getElementById(wrapId);
+        var input = document.getElementById(inputId);
+        var cancel = document.getElementById(cancelId);
+        var btn = document.getElementById(btnId);
+        var mode = document.getElementById(modeId);
+        if (!select || !wrap || !input || !cancel || !btn || !mode) return null;
+
+        function showInput() {
+          select.classList.add('is-hidden');
+          btn.style.display = 'none';
+          wrap.classList.add('open');
+          input.required = true;
+          select.required = false;
+          mode.value = 'new';
+          setTimeout(function () { input.focus(); }, 180);
+          if (onActivate) onActivate();
+        }
+
+        function showSelect() {
+          select.classList.remove('is-hidden');
+          btn.style.display = '';
+          wrap.classList.remove('open');
+          input.required = false;
+          input.value = '';
+          select.required = true;
+          select.value = '';
+          mode.value = 'existing';
+          select.dispatchEvent(new Event('change'));
+        }
+
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          showInput();
+        });
+
+        cancel.addEventListener('click', function (e) {
+          e.preventDefault();
+          showSelect();
+        });
+
+        if (mode.value === 'new') showInput();
+
+        return { showInput: showInput };
+      }
+
+      // A brand-new department can't have any existing designations yet, so
+      // choosing "Add new department" also switches Designation into "add new"
+      // mode automatically — no need to pick that separately.
+      var roleToggle = wireAddNew('role', 'role_new_wrap', 'new_role', 'role_cancel_new', 'role_add_btn', 'role_mode');
+      wireAddNew('department', 'department_new_wrap', 'new_department', 'department_cancel_new', 'department_add_btn', 'department_mode', function () {
+        if (roleToggle) roleToggle.showInput();
+      });
+    })();
+  </script>
+
+</body>
+</html>

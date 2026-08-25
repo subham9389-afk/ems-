@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Departments{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Organization</div>
+    <h1>Departments</h1>
+    <p class="sub">{{ departments|length }} department{{ 's' if departments|length != 1 else '' }}</p>
+  </div>
+</div>
+
+<div class="filter-bar" style="margin-bottom: 16px; justify-content: space-between;">
+  <form method="get" action="{{ url_for('departments') }}" style="display: flex; gap: 10px; align-items: center;">
+    <select name="department" class="filter-select" onchange="this.form.submit()">
+      <option value="">All Departments</option>
+      {% for name in all_departments %}
+      <option value="{{ name }}" {% if name == selected_department %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+    {% if selected_department %}
+    <a href="{{ url_for('departments') }}" class="btn btn-ghost btn-sm">Clear</a>
+    {% endif %}
+  </form>
+
+  <form method="post" action="{{ url_for('departments') }}" style="display: flex; gap: 10px; align-items: center;">
+    <input
+      class="search-input"
+      type="text"
+      name="name"
+      placeholder="New department name…"
+      required
+    />
+    <button type="submit" class="btn btn-primary btn-sm">+ Add Department</button>
+  </form>
+</div>
+
+<div class="stat-row">
+  {% for dept in departments %}
+  <a href="{{ url_for('employee_list', department=dept.name) }}" class="card stat-card stat-card-link">
+    <div class="stat-corner" style="background: var(--primary);"></div>
+    <div class="stat-label">{{ dept.name }}</div>
+    <div class="stat-value">{{ dept.count }}</div>
+    <div style="margin-top: 6px; font-size: 13px; color: var(--text-muted);">
+      Total Salary: ₹{{ "{:,.0f}".format(dept.total_salary) }}
+    </div>
+    {% if dept.members %}
+    <div style="margin-top: 12px; display: flex; align-items: center;">
+      {% for member_name in dept.members[:3] %}
+      <div style="{% if not loop.first %}margin-left: -8px;{% endif %} border: 2px solid var(--surface); border-radius: 50%;">
+        {{ avatar(member_name, 30) }}
+      </div>
+      {% endfor %}
+      {% if dept.members|length > 3 %}
+      <div style="margin-left: -8px; border: 2px solid var(--surface); border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text-muted); font-size: 11px; font-weight: 700; flex-shrink: 0;">
+        +{{ dept.members|length - 3 }}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </a>
+  {# whole card is the live link to that department's employees — no separate "View employees" button #}
+  {% else %}
+  <p style="color: var(--text-muted);">{% if selected_department %}No department named "{{ selected_department }}".{% else %}No departments yet — add one above.{% endif %}</p>
+  {% endfor %}
+</div>
+
+{% endblock %}
