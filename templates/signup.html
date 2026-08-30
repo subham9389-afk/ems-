@@ -29,11 +29,11 @@
       <div class="form-row">
         <div class="field">
           <label for="first_name">First name</label>
-          <input type="text" id="first_name" name="first_name" value="{{ form.get('first_name', '') }}" required />
+          <input type="text" id="first_name" name="first_name" value="{{ form.get('first_name', '') }}"maxlength="16"pattern="[A-Za-z]+" title="Letters only"  required />
         </div>
         <div class="field">
           <label for="last_name">Last name</label>
-          <input type="text" id="last_name" name="last_name" value="{{ form.get('last_name', '') }}" required />
+          <input type="text" id="last_name" name="last_name" value="{{ form.get('last_name', '') }}"maxlength="16"pattern="[A-Za-z]+" title="Letters only"  required />
         </div>
       </div>
 
@@ -104,7 +104,7 @@
 
       <div class="field" style="margin-bottom: 14px;">
         <label for="username">Choose a username</label>
-        <input type="text" id="username" name="username" value="{{ form.get('username', '') }}" required />
+        <input type="text" id="username" name="username" value="{{ form.get('username', '') }}"maxlength="32" required />
       </div>
 
       <div class="form-row">
@@ -150,6 +150,17 @@
       phone.addEventListener('input', function () {
         phone.value = phone.value.replace(/\D/g, '').slice(0, 10);
       });
+    })();
+    
+    // First/last name: letters only, no digits or symbols.
+    (function () {
+      ['first_name', 'last_name'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', function () {
+      el.value = el.value.replace(/[^A-Za-z]/g, '');
+      });
+    });
     })();
 
     // While typing the email, show a clickable "gmail.com" suggestion below the

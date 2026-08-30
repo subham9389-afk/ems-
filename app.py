@@ -17,7 +17,13 @@ PROFILE_PHOTO_DIR = os.path.join("static", "uploads", "profile_photos")
 ALLOWED_PHOTO_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 
 # Only Gmail addresses are accepted on the public self-signup form.
-GMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@gmail\.com$", re.IGNORECASE)
+GMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@gmail\.com$", re.IGNORECASE) 
+
+# Name fields: letters only, no digits or symbols. First/last name is a single
+# word (no spaces); a combined "full name" field allows spaces between words.
+NAME_RE = re.compile(r"^[A-Za-z]+$")
+FULL_NAME_RE = re.compile(r"^[A-Za-z]+(?: [A-Za-z]+)*$")
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
 # ---------------------------------------------------------------------------
 # Fixed reference data (seeded into the departments/designations tables the
@@ -891,6 +897,22 @@ def add_employee():
 
         if not all([first_name, last_name, email]):
             flash("Please fill in all required fields.")
+            return rerender()
+        
+        if len(first_name) > 16:
+            flash("First name must be 16 characters or fewer.")
+            return rerender()
+
+        if not NAME_RE.match(first_name):
+            flash("First name can only contain letters.")
+            return rerender()
+
+        if len(last_name) > 16:
+            flash("Last name must be 16 characters or fewer.")
+            return rerender()
+
+        if not NAME_RE.match(last_name):
+            flash("Last name can only contain letters.")
             return rerender()
 
         if department_mode == "new":
@@ -1819,6 +1841,30 @@ def signup():
         if not all([username, password, first_name, last_name, email]):
             flash("Please fill in all required fields.")
             return rerender()
+        
+        if len(first_name) > 16:
+            flash("First name must be 16 characters or fewer.")
+            return rerender()
+        
+        if not NAME_RE.match(first_name):
+            flash("First name can only contain letters.")
+            return rerender()
+    
+        if len(last_name) > 16:
+            flash("Last name must be 16 characters or fewer.")
+            return rerender()
+
+        if not NAME_RE.match(last_name):
+            flash("Last name can only contain letters.")
+            return rerender()
+
+        if len(username) > 32:
+            flash("Username must be 32 characters or fewer.")
+            return rerender()
+
+        if not USERNAME_RE.match(username):
+            flash("Username can only contain letters, numbers, and underscores.")
+            return rerender()
 
         if department_mode == "new":
             if not new_department:
@@ -2123,9 +2169,25 @@ def view_profile():
         if not full_name:
             flash("Name can't be empty.")
             return redirect(url_for("view_profile"))
+        
+        if len(full_name) > 32:
+            flash("Full name must be 32 characters or fewer.")
+            return redirect(url_for("view_profile"))
+
+        if not FULL_NAME_RE.match(full_name):
+            flash("Full name can only contain letters and spaces.")
+            return redirect(url_for("view_profile"))
 
         if not username:
             flash("Username can't be empty.")
+            return redirect(url_for("view_profile"))
+
+        if len(username) > 32:
+            flash("Username must be 32 characters or fewer.")
+            return redirect(url_for("view_profile"))
+
+        if not USERNAME_RE.match(username):
+            flash("Username can only contain letters, numbers, and underscores.")
             return redirect(url_for("view_profile"))
 
         if username != user["username"]:

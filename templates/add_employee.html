@@ -13,12 +13,12 @@
   <div class="form-row">
     <div class="field">
       <label for="first_name">First name</label>
-      <input type="text" id="first_name" name="first_name" value="{{ form.get('first_name', '') }}" required />
+      <input type="text" id="first_name" name="first_name" value="{{ form.get('first_name', '') }}" maxlength="16" pattern="[A-Za-z]+" title="Letters only"  required />
     </div>
 
     <div class="field">
       <label for="last_name">Last name</label>
-      <input type="text" id="last_name" name="last_name" value="{{ form.get('last_name', '') }}" required />
+      <input type="text" id="last_name" name="last_name" value="{{ form.get('last_name', '') }}" maxlength="16" pattern="[A-Za-z]+" title="Letters only"  required />
     </div>
   </div>
 
@@ -118,6 +118,16 @@
       phone.value = phone.value.replace(/\D/g, '').slice(0, 10);
     });
   })();
+  // First/last name: letters only, no digits or symbols.
+(function () {
+  ['first_name', 'last_name'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', function () {
+      el.value = el.value.replace(/[^A-Za-z]/g, '');
+    });
+  });
+})();
 
   // Designation dropdown: only show designations that belong to the selected
   // department (an option with no data-department shows under every department).

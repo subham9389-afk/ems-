@@ -77,6 +77,14 @@
       document.getElementById('removePhotoForm').submit();
     }
   }
+  // Full name: letters and spaces only, no digits or symbols.
+  (function () {
+    var fullName = document.getElementById('full_name');
+    if (!fullName) return;
+    fullName.addEventListener('input', function () {
+      fullName.value = fullName.value.replace(/[^A-Za-z ]/g, '').replace(/ {2,}/g, ' ');
+    });
+   })();
 
   function openCamera() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -134,7 +142,7 @@
   <div class="form-row">
     <div class="field">
       <label for="full_name">Full name</label>
-      <input type="text" id="full_name" name="full_name" value="{{ user['full_name'] or '' }}" required />
+      <input type="text" id="full_name" name="full_name" value="{{ user['full_name'] or '' }}"maxlength="32" pattern="[A-Za-z]+( [A-Za-z]+)*" title="Letters and spaces only" required />
     </div>
     <div class="field">
       <label for="email">Email</label>
@@ -150,7 +158,7 @@
     </div>
     <div class="field">
       <label for="username">Username</label>
-      <input type="text" id="username" name="username" value="{{ user['username'] }}" required />
+      <input type="text" id="username" name="username" value="{{ user['username'] }}"maxlength="32" required />
     </div>
   </div>
 
@@ -204,7 +212,7 @@
   {% else %}
   <div class="field">
     <label for="username">Username</label>
-    <input type="text" id="username" name="username" value="{{ user['username'] }}" required />
+    <input type="text" id="username" name="username" value="{{ user['username'] }}"maxlength="32" required />
   </div>
   {% endif %}
 
