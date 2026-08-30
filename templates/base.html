@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+{% set settings_subpage = session.get('logged_in') and request.endpoint in ['change_password', 'privacy', 'app_theme', 'audit_logs', 'view_profile'] %}
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -21,7 +22,7 @@
     })();
   </script>
 </head>
-<body>
+<body{% if settings_subpage %} data-settings-subpage="true" data-settings-url="{{ url_for('settings_index') }}"{% endif %}>
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
@@ -131,7 +132,7 @@
         </div>
 
         {% if session.get('logged_in') %}
-        {% set settings_open = request.endpoint in ['change_password', 'privacy', 'app_theme', 'audit_logs', 'settings_index', 'view_profile'] %}
+        {% set settings_open = settings_subpage or request.endpoint == 'settings_index' %}
         <a href="{{ url_for('settings_index') }}" class="nav-link {{ 'active' if settings_open else '' }}">
           <span class="nav-toggle-label">⚙ Settings</span>
         </a>
@@ -224,10 +225,99 @@
   </script>
 
   <script>
+    (function () {
+      var target = document.querySelector('.main-area') || document.body;
+
+      // On a settings sub-page (View Profile, Privacy, App Theme, Audit Logs,
+      // Change Password) a swipe always means "take me back to Settings" —
+      // there's no meaningful next/previous item within that section.
+      var settingsSubpage = document.body.getAttribute('data-settings-subpage') === 'true';
+      var settingsUrl = document.body.getAttribute('data-settings-url');
+
+      if (settingsSubpage && settingsUrl) {
+        var SWIPE_THRESHOLD = 60;
+        var SWIPE_RESTRAINT = 75;
+        var triggered = false;
+
+        function goToSettings() {
+          if (triggered) return;
+          triggered = true;
+          window.location.href = settingsUrl;
+        }
+
+        // Touchscreen two-finger swipe.
+        var touchStartX = 0, touchStartY = 0, touchEndX = 0, touchEndY = 0;
+        var isTwoFingerGesture = false;
+
+        function averagePoint(touches) {
+          var x = 0, y = 0;
+          for (var i = 0; i < touches.length; i++) {
+            x += touches[i].clientX;
+            y += touches[i].clientY;
+          }
+          return { x: x / touches.length, y: y / touches.length };
+        }
+
+        target.addEventListener('touchstart', function (e) {
+          if (e.touches.length === 2) {
+            isTwoFingerGesture = true;
+            var p = averagePoint(e.touches);
+            touchStartX = p.x;
+            touchStartY = p.y;
+            touchEndX = p.x;
+            touchEndY = p.y;
+          } else {
+            isTwoFingerGesture = false;
+          }
+        }, { passive: true });
+
+        target.addEventListener('touchmove', function (e) {
+          if (isTwoFingerGesture && e.touches.length === 2) {
+            var p = averagePoint(e.touches);
+            touchEndX = p.x;
+            touchEndY = p.y;
+          }
+        }, { passive: true });
+
+        target.addEventListener('touchend', function (e) {
+          if (!isTwoFingerGesture) return;
+          if (e.touches.length === 0) {
+            var deltaX = touchEndX - touchStartX;
+            var deltaY = touchEndY - touchStartY;
+            isTwoFingerGesture = false;
+            if (Math.abs(deltaX) >= SWIPE_THRESHOLD && Math.abs(deltaY) <= SWIPE_RESTRAINT) {
+              goToSettings();
+            }
+          }
+        }, { passive: true });
+
+        // Laptop / desktop trackpad two-finger swipe (wheel event with deltaX).
+        var wheelAccumX = 0;
+        var wheelResetTimer = null;
+        var WHEEL_THRESHOLD = 50;
+
+        target.addEventListener('wheel', function (e) {
+          if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+          wheelAccumX += e.deltaX;
+
+          clearTimeout(wheelResetTimer);
+          wheelResetTimer = setTimeout(function () { wheelAccumX = 0; }, 200);
+
+          if (Math.abs(wheelAccumX) >= WHEEL_THRESHOLD) {
+            goToSettings();
+          }
+        }, { passive: true });
+
+        return; // don't also run the generic sidebar-cycling swipe below
+      }
+    })();
+
     // Two-finger swipe navigation: right swipe -> next menu option, left swipe -> previous option
     // Handles BOTH real touchscreens (touch events) AND laptop/desktop trackpads
     // (which send 'wheel' events with deltaX for a 2-finger horizontal swipe, not touch events).
     (function () {
+      if (document.body.getAttribute('data-settings-subpage') === 'true') return; // handled above
+
       // Collect all navigable menu links (top-level + submenu links) in the order they appear.
       var navLinks = Array.prototype.slice.call(
         document.querySelectorAll('.sidebar a.nav-link, .sidebar a.nav-sublink')
