@@ -159,15 +159,24 @@
               <span style="position: absolute; top: -4px; right: -4px; background: var(--accent-red, #e5534b); color: #fff; font-size: 10px; line-height: 1; font-weight: 700; padding: 3px 5px; border-radius: 999px; min-width: 16px; text-align: center;">{{ announcement_count if announcement_count < 100 else '99+' }}</span>
               {% endif %}
             </a>
-            <a href="{{ url_for('privacy') }}" title="{{ current_username }}" style="display: flex; align-items: center;">
-              <div class="avatar-circle" style="width: 34px; height: 34px;">
-                {% if current_photo %}
-                  <img src="{{ url_for('static', filename=current_photo) }}" alt="{{ current_username }}" />
-                {% else %}
-                  <span class="avatar-initial" style="font-size: 14px;">{{ current_username[0]|upper if current_username else '?' }}</span>
-                {% endif %}
+            <div class="navbar-profile" style="position: relative;">
+              <button type="button" id="profileMenuBtn" title="{{ current_username }}" style="display: flex; align-items: center; background: none; border: none; padding: 0; cursor: pointer;">
+                <div class="avatar-circle" style="width: 34px; height: 34px;">
+                  {% if current_photo %}
+                    <img src="{{ url_for('static', filename=current_photo) }}" alt="{{ current_username }}" />
+                  {% else %}
+                    <span class="avatar-initial" style="font-size: 14px;">{{ current_username[0]|upper if current_username else '?' }}</span>
+                  {% endif %}
+                </div>
+              </button>
+              <div id="profileMenu" style="display: none; position: absolute; top: 42px; right: 0; min-width: 160px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); overflow: hidden; z-index: 50;">
+                <a href="{{ url_for('view_profile') }}" class="profile-menu-link" style="display: block; padding: 10px 14px; font-size: 13px; color: var(--text); text-decoration: none;">View Profile</a>
+                <a href="{{ url_for('logout') }}" class="profile-menu-link" style="display: block; padding: 10px 14px; font-size: 13px; color: var(--accent-red, #e5534b); text-decoration: none; border-top: 1px solid var(--border);">Logout</a>
               </div>
-            </a>
+            </div>
+            <style>
+              .profile-menu-link:hover { background: var(--surface-2, var(--primary-soft, rgba(0,0,0,0.04))); }
+            </style>
           {% else %}
             <a href="{{ url_for('login') }}" class="navbar-login">Login</a>
           {% endif %}
@@ -219,6 +228,25 @@
           !e.target.closest('#sidebarToggle')
         ) {
           shell.classList.remove('mobile-nav-open');
+        }
+      });
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('profileMenuBtn');
+      var menu = document.getElementById('profileMenu');
+      if (!btn || !menu) return;
+
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+      });
+
+      document.addEventListener('click', function (e) {
+        if (menu.style.display === 'block' && !e.target.closest('#profileMenu') && !e.target.closest('#profileMenuBtn')) {
+          menu.style.display = 'none';
         }
       });
     })();

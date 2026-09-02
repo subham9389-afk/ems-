@@ -29,7 +29,8 @@
       <div style="display: flex; gap: 8px; flex-shrink: 0;">
         <a href="{{ url_for('edit_announcement', ann_id=a['id']) }}" class="btn btn-ghost btn-sm">Edit</a>
         <form method="post" action="{{ url_for('delete_announcement', ann_id=a['id']) }}"
-              onsubmit="return confirm('Delete this announcement?');">
+              onsubmit="return confirmDeleteWithReason(this);">
+          <input type="hidden" name="reason" />
           <button type="submit" class="btn btn-ghost btn-sm">Delete</button>
         </form>
       </div>
@@ -47,5 +48,17 @@
   No announcements yet.
 </div>
 {% endif %}
-
+<script>
+  function confirmDeleteWithReason(form) {
+    var reason = prompt('Please enter a reason for deleting this announcement:');
+    if (reason === null) return false; // cancelled
+    reason = reason.trim();
+    if (!reason) {
+      alert('A reason is required to delete an announcement.');
+      return false;
+    }
+    form.querySelector('input[name="reason"]').value = reason;
+    return true;
+  }
+</script>
 {% endblock %}

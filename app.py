@@ -3,7 +3,7 @@ import io
 import os
 import re
 import db_compat
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 
 from flask import Flask, render_template, request, redirect, url_for, g, flash, session, jsonify
@@ -17,13 +17,12 @@ PROFILE_PHOTO_DIR = os.path.join("static", "uploads", "profile_photos")
 ALLOWED_PHOTO_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 
 # Only Gmail addresses are accepted on the public self-signup form.
-GMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@gmail\.com$", re.IGNORECASE) 
+GMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@gmail\.com$", re.IGNORECASE)
 
 # Name fields: letters only, no digits or symbols. First/last name is a single
 # word (no spaces); a combined "full name" field allows spaces between words.
 NAME_RE = re.compile(r"^[A-Za-z]+$")
 FULL_NAME_RE = re.compile(r"^[A-Za-z]+(?: [A-Za-z]+)*$")
-USERNAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
 # ---------------------------------------------------------------------------
 # Fixed reference data (seeded into the departments/designations tables the
@@ -93,6 +92,30 @@ def sync_employee_status_from_attendance(db, emp_id, attendance_status, attendan
         db.execute("UPDATE employees SET status = ? WHERE id = ?", (new_status, emp_id))
 LEAVE_TYPES = ["Sick Leave", "Casual Leave", "Earned Leave", "Unpaid Leave","Maternity Leave", "Paternity Leave", "Bereavement Leave", "Compensatory Off", "Study Leave", "Sabbatical Leave", "Other"]
 LEAVE_STATUSES = ["Pending", "Approved", "Rejected"]
+
+
+def mark_attendance_for_leave(db, employee_id, start_date, end_date):
+    """Fill in an attendance row for every day an approved leave covers, so the
+    days show up on the attendance sheet instead of looking unaccounted-for."""
+    start = datetime.strptime(start_date, "%Y-%m-%d").date()
+    end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    day = start
+    while day <= end:
+        iso = day.isoformat()
+        existing = db.execute(
+            "SELECT id FROM attendance WHERE employee_id = ? AND date = ?", (employee_id, iso)
+        ).fetchone()
+        if existing:
+            db.execute(
+                "UPDATE attendance SET status = 'On Leave', check_in = NULL, check_out = NULL WHERE id = ?",
+                (existing["id"],),
+            )
+        else:
+            db.execute(
+                "INSERT INTO attendance (employee_id, date, status) VALUES (?, ?, 'On Leave')",
+                (employee_id, iso),
+            )
+        day += timedelta(days=1)
 
 # Role-based access control: three roles.
 #   Admin      - full access to every module, including audit logs.
@@ -898,7 +921,7 @@ def add_employee():
         if not all([first_name, last_name, email]):
             flash("Please fill in all required fields.")
             return rerender()
-        
+
         if len(first_name) > 16:
             flash("First name must be 16 characters or fewer.")
             return rerender()
@@ -935,36 +958,18 @@ def add_employee():
             flash("Please use a valid @gmail.com email address.")
             return rerender()
 
-        # Resolve "+ Add new department/designation" into an actual department/role
-        # name, creating the row in the reference tables if it doesn't exist yet.
+        # A custom "Other" department/designation belongs only to this person —
+        # it's never inserted into the shared departments/designations tables,
+        # so it never mixes into the dropdown options anyone else sees.
         if department_mode == "new":
-            existing = db.execute(
-                "SELECT name FROM departments WHERE name = ? COLLATE NOCASE", (new_department,)
-            ).fetchone()
-            if existing:
-                department = existing["name"]
-            else:
-                db.execute("INSERT INTO departments (name) VALUES (?)", (new_department,))
-                db.commit()
-                department = new_department
-            dept_names = get_department_names(db)
+            department = new_department
+        elif department not in dept_names:
+            flash("Please choose a valid department and designation from the list.")
+            return rerender()
 
         if role_mode == "new":
-            existing = db.execute(
-                "SELECT name FROM designations WHERE name = ? COLLATE NOCASE", (new_role,)
-            ).fetchone()
-            if existing:
-                role = existing["name"]
-            else:
-                db.execute(
-                    "INSERT INTO designations (name, department) VALUES (?, ?)", (new_role, department)
-                )
-                db.commit()
-                role = new_role
-            role_names = get_designation_names(db)
-            role_rows = get_designations_with_department(db)
-
-        if department not in dept_names or role not in role_names or not is_role_valid_for_department(db, department, role):
+            role = new_role
+        elif role not in role_names or not is_role_valid_for_department(db, department, role):
             flash("Please choose a valid department and designation from the list.")
             return rerender()
 
@@ -1482,14 +1487,32 @@ def apply_leave():
             flash("End date can't be before the start date.")
             return render_template("apply_leave.html", employees=employees, is_staff=is_staff, leave_types=LEAVE_TYPES, form=request.form)
 
+        # An Admin filing leave on someone's behalf doesn't need a separate
+        # approval step — it's approved the moment it's submitted. Anyone else
+        # (including HR Manager, or an employee filing for themselves) still
+        # goes through the normal Pending -> Approve/Reject flow.
+        auto_approve = session.get("role") == "Admin"
+        status = "Approved" if auto_approve else "Pending"
+        today_iso = date.today().isoformat()
+
         db.execute(
-            "INSERT INTO leaves (employee_id, leave_type, start_date, end_date, reason, status, applied_on) "
-            "VALUES (?, ?, ?, ?, ?, 'Pending', ?)",
-            (target_emp_id, leave_type, start_date, end_date, reason, date.today().isoformat()),
+            "INSERT INTO leaves (employee_id, leave_type, start_date, end_date, reason, status, applied_on, decided_by, decided_on) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                target_emp_id, leave_type, start_date, end_date, reason, status, today_iso,
+                session.get("username") if auto_approve else None,
+                today_iso if auto_approve else None,
+            ),
         )
+
+        if auto_approve:
+            mark_attendance_for_leave(db, target_emp_id, start_date, end_date)
+            if start_date <= today_iso <= end_date:
+                db.execute("UPDATE employees SET status = 'On Leave' WHERE id = ?", (target_emp_id,))
+
         db.commit()
-        flash("Leave application submitted.")
-        log_audit("Leave applied", f"employee_id={target_emp_id}, {leave_type} {start_date} to {end_date}")
+        flash("Leave application submitted and auto-approved." if auto_approve else "Leave application submitted.")
+        log_audit("Leave applied", f"employee_id={target_emp_id}, {leave_type} {start_date} to {end_date}" + (", auto-approved" if auto_approve else ""))
         return redirect(url_for("leave_list"))
 
     return render_template("apply_leave.html", employees=employees, is_staff=is_staff, leave_types=LEAVE_TYPES, form={})
@@ -1515,8 +1538,10 @@ def decide_leave(leave_id):
         (decision, session.get("username"), date.today().isoformat(), leave_id),
     )
 
-    # Reflect an approved leave that covers today on the employee's status.
+    # Reflect an approved leave on attendance for every day it covers, and on
+    # the employee's status if it covers today.
     if decision == "Approved":
+        mark_attendance_for_leave(db, leave["employee_id"], leave["start_date"], leave["end_date"])
         today = date.today().isoformat()
         if leave["start_date"] <= today <= leave["end_date"]:
             db.execute("UPDATE employees SET status = 'On Leave' WHERE id = ?", (leave["employee_id"],))
@@ -1799,10 +1824,15 @@ def edit_announcement(ann_id):
 @roles_required("Admin", "HR", "HR Manager")
 def delete_announcement(ann_id):
     db = get_db()
+    reason = request.form.get("reason", "").strip()
+    if not reason:
+        flash("Please provide a reason for deleting this announcement.")
+        return redirect(url_for("announcements"))
+
     ann = db.execute("SELECT title FROM announcements WHERE id = ?", (ann_id,)).fetchone()
     db.execute("DELETE FROM announcements WHERE id = ?", (ann_id,))
     db.commit()
-    log_audit("Announcement deleted", f"{ann['title'] if ann else ann_id}, id={ann_id}")
+    log_audit("Announcement deleted", f"{ann['title'] if ann else ann_id}, id={ann_id}, reason={reason}")
     flash("Announcement deleted.")
     return redirect(url_for("announcements"))
 
@@ -1841,15 +1871,15 @@ def signup():
         if not all([username, password, first_name, last_name, email]):
             flash("Please fill in all required fields.")
             return rerender()
-        
+
         if len(first_name) > 16:
             flash("First name must be 16 characters or fewer.")
             return rerender()
-        
+
         if not NAME_RE.match(first_name):
             flash("First name can only contain letters.")
             return rerender()
-    
+
         if len(last_name) > 16:
             flash("Last name must be 16 characters or fewer.")
             return rerender()
@@ -1860,10 +1890,6 @@ def signup():
 
         if len(username) > 32:
             flash("Username must be 32 characters or fewer.")
-            return rerender()
-
-        if not USERNAME_RE.match(username):
-            flash("Username can only contain letters, numbers, and underscores.")
             return rerender()
 
         if department_mode == "new":
@@ -1894,36 +1920,18 @@ def signup():
             flash("Please sign up with a valid @gmail.com email address.")
             return rerender()
 
-        # Resolve "+ Add new department/designation" into an actual department/role
-        # name, creating the row in the reference tables if it doesn't exist yet.
+        # A custom "Other" department/designation belongs only to this person —
+        # it's never inserted into the shared departments/designations tables,
+        # so it never mixes into the dropdown options anyone else sees.
         if department_mode == "new":
-            existing = db.execute(
-                "SELECT name FROM departments WHERE name = ? COLLATE NOCASE", (new_department,)
-            ).fetchone()
-            if existing:
-                department = existing["name"]
-            else:
-                db.execute("INSERT INTO departments (name) VALUES (?)", (new_department,))
-                db.commit()
-                department = new_department
-            dept_names = get_department_names(db)
+            department = new_department
+        elif department not in dept_names:
+            flash("Please choose a valid department and designation from the list.")
+            return rerender()
 
         if role_mode == "new":
-            existing = db.execute(
-                "SELECT name FROM designations WHERE name = ? COLLATE NOCASE", (new_role,)
-            ).fetchone()
-            if existing:
-                role = existing["name"]
-            else:
-                db.execute(
-                    "INSERT INTO designations (name, department) VALUES (?, ?)", (new_role, department)
-                )
-                db.commit()
-                role = new_role
-            role_names = get_designation_names(db)
-            role_rows = get_designations_with_department(db)
-
-        if department not in dept_names or role not in role_names or not is_role_valid_for_department(db, department, role):
+            role = new_role
+        elif role not in role_names or not is_role_valid_for_department(db, department, role):
             flash("Please choose a valid department and designation from the list.")
             return rerender()
 
@@ -2169,7 +2177,7 @@ def view_profile():
         if not full_name:
             flash("Name can't be empty.")
             return redirect(url_for("view_profile"))
-        
+
         if len(full_name) > 32:
             flash("Full name must be 32 characters or fewer.")
             return redirect(url_for("view_profile"))
@@ -2184,10 +2192,6 @@ def view_profile():
 
         if len(username) > 32:
             flash("Username must be 32 characters or fewer.")
-            return redirect(url_for("view_profile"))
-
-        if not USERNAME_RE.match(username):
-            flash("Username can only contain letters, numbers, and underscores.")
             return redirect(url_for("view_profile"))
 
         if username != user["username"]:
