@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS announcements (
     updated_at TEXT
 );
 
+
 CREATE TABLE IF NOT EXISTS report_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     notes TEXT,
@@ -103,7 +104,18 @@ CREATE TABLE IF NOT EXISTS announcement_reads (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE
 );
-
+-- Tracks which announcements each user has individually "cleared" from their
+-- own view. Clearing is personal — it hides the announcement for that one
+-- user only and never deletes or affects it for anyone else.
+CREATE TABLE IF NOT EXISTS announcement_clears (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    announcement_id INTEGER NOT NULL,
+    cleared_at TEXT NOT NULL,
+    UNIQUE(user_id, announcement_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE
+);
 -- Self-signup requests submitted from the public "Create Account" page.
 -- An Admin reviews each request; approving one creates the employee record
 -- and the login account, rejecting one leaves no account behind.

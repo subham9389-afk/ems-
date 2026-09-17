@@ -675,6 +675,41 @@ html[data-theme="dark"] .search-input { background: var(--surface); color: var(-
   align-items: stretch;
 }
 .select-with-add select { flex: 1; min-width: 0; }
+/* ---------- "Other" swap: select is replaced in place by a text input,
+   right on the same line, instead of opening a separate row below ---------- */
+
+.combo-input {
+  display: none;
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+.combo-input.open { display: block; }
+.combo-input input {
+  width: 100%;
+  height: 100%;
+  padding-right: 30px;
+}
+.combo-clear {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.combo-clear:hover {
+  color: var(--primary);
+  background: rgba(0, 0, 0, 0.05);
+}
+
 .add-new-btn {
   flex: 0 0 auto;
   width: 42px;

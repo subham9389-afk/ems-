@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Others — Designations{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">
+      <a href="{{ url_for('designations') }}" style="color: inherit; text-decoration: none;">Organization</a>
+    </div>
+    <h1>Others</h1>
+    <p class="sub">{{ designations|length }} custom designation{{ 's' if designations|length != 1 else '' }}</p>
+  </div>
+  <a href="{{ url_for('designations') }}" class="btn btn-ghost btn-sm">&larr; Back to Designations</a>
+</div>
+
+<div class="card" style="padding: 0; margin-top: 16px;">
+  <div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Designation</th>
+        <th>Department</th>
+        <th>Employees</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in designations %}
+      <tr>
+        <td style="font-weight: 600;">{{ d.name }}</td>
+        <td style="color: var(--text-muted);">{{ d.departments|join(', ') if d.departments else 'All departments' }}</td>
+        <td style="color: var(--text-muted);">{{ d.count }}</td>
+        <td>
+          <div class="row-actions">
+            <a href="{{ url_for('employee_list', q=d.name) }}" class="btn btn-ghost btn-sm">View employees</a>
+            <form method="post" action="{{ url_for('delete_other_designation') }}"
+                  onsubmit="return confirm('Delete {{ d.name }}? This will clear it from {{ d.count }} employee(s) — they\'ll need a new designation assigned.');">
+              <input type="hidden" name="name" value="{{ d.name }}">
+              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4" style="color: var(--text-muted);">No custom designations yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% endblock %}
+

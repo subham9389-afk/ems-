@@ -6,7 +6,8 @@
   <div>
     <div class="eyebrow">Organization</div>
     <h1>Designations</h1>
-    <p class="sub">{{ designations|length }} designation{{ 's' if designations|length != 1 else '' }}</p>
+    {% set row_count = designations|length + (1 if others_summary else 0) %}
+    <p class="sub">{{ row_count }} designation{{ 's' if row_count != 1 else '' }}</p>
   </div>
   <form method="post" action="{{ url_for('designations') }}" style="display: flex; gap: 10px; align-items: center;">
     <input
@@ -54,10 +55,24 @@
         </td>
       </tr>
       {% else %}
+      {% if not others_summary %}
       <tr>
         <td colspan="4" style="color: var(--text-muted);">No designations yet — add one above.</td>
       </tr>
+      {% endif %}
       {% endfor %}
+      {% if others_summary %}
+      <tr>
+        <td style="font-weight: 600;">Others</td>
+        <td style="color: var(--text-muted);">Various</td>
+        <td style="color: var(--text-muted);">{{ others_summary.count }}</td>
+        <td>
+          <div class="row-actions">
+            <a href="{{ url_for('designations_others') }}" class="btn btn-ghost btn-sm">View</a>
+          </div>
+        </td>
+      </tr>
+      {% endif %}
     </tbody>
   </table>
   </div>

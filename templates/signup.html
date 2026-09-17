@@ -29,11 +29,11 @@
       <div class="form-row">
         <div class="field">
           <label for="first_name">First name</label>
-          <input type="text" id="first_name" name="first_name" value="{{ form.get('first_name', '') }}"maxlength="16"pattern="[A-Za-z]+" title="Letters only"  required />
+          <input type="text" id="first_name" name="first_name" value="{{ form.get('first_name', '') }}" maxlength="16" pattern="[A-Za-z]+" title="Letters only"  required />
         </div>
         <div class="field">
           <label for="last_name">Last name</label>
-          <input type="text" id="last_name" name="last_name" value="{{ form.get('last_name', '') }}"maxlength="16"pattern="[A-Za-z]+" title="Letters only"  required />
+          <input type="text" id="last_name" name="last_name" value="{{ form.get('last_name', '') }}" maxlength="16" pattern="[A-Za-z]+" title="Letters only"  required />
         </div>
       </div>
 
@@ -61,13 +61,13 @@
               {% for dept in departments %}
               <option value="{{ dept }}" {{ 'selected' if form.get('department') == dept else '' }}>{{ dept }}</option>
               {% endfor %}
+              <option value="__other__" {{ 'selected' if form.get('department_mode') == 'new' else '' }}>Other</option>
             </select>
-            <button type="button" id="department_add_btn" class="add-new-btn" title="Add new department">＋</button>
-          </div>
-          <div class="add-new-slide" id="department_new_wrap">
-            <input type="text" id="new_department" name="new_department" value="{{ form.get('new_department', '') }}"
-                   placeholder="Enter new department name" />
-            <a href="#" id="department_cancel_new" style="font-size: 12px; color: var(--primary); font-weight: 600;">← Choose from list</a>
+            <div class="combo-input" id="department_input_wrap">
+              <input type="text" id="new_department" name="new_department" value="{{ form.get('new_department', '') }}"
+                     placeholder="Please specify" />
+              <button type="button" class="combo-clear" id="department_clear_btn" title="Choose from list" aria-label="Choose from list">×</button>
+            </div>
           </div>
           <input type="hidden" id="department_mode" name="department_mode" value="{{ 'new' if form.get('department_mode') == 'new' else 'existing' }}" />
         </div>
@@ -79,14 +79,14 @@
               {% for r in role_rows %}
               <option value="{{ r.name }}" data-department="{{ r.department or '' }}" {{ 'selected' if form.get('role') == r.name else '' }}>{{ r.name }}</option>
               {% endfor %}
+              <option value="__other__" {{ 'selected' if form.get('role_mode') == 'new' else '' }}>Other</option>
             </select>
-            <button type="button" id="role_add_btn" class="add-new-btn" title="Add new designation">＋</button>
-          </div>
-          <div class="add-new-slide" id="role_new_wrap">
-            <input type="text" id="new_role" name="new_role" value="{{ form.get('new_role', '') }}"
-                   placeholder="Enter new designation name" />
-            <a href="#" id="role_cancel_new" style="font-size: 12px; color: var(--primary); font-weight: 600;">← Choose from list</a>
-          </div>
+            <div class="combo-input" id="role_input_wrap">
+              <input type="text" id="new_role" name="new_role" value="{{ form.get('new_role', '') }}"
+                     placeholder="Please specify" />
+              <button type="button" class="combo-clear" id="role_clear_btn" title="Choose from list" aria-label="Choose from list">×</button>
+            </div>
+          </div>  
           <input type="hidden" id="role_mode" name="role_mode" value="{{ 'new' if form.get('role_mode') == 'new' else 'existing' }}" />
         </div>
       </div>
@@ -104,7 +104,7 @@
 
       <div class="field" style="margin-bottom: 14px;">
         <label for="username">Choose a username</label>
-        <input type="text" id="username" name="username" value="{{ form.get('username', '') }}"maxlength="32" required />
+        <input type="text" id="username" name="username" value="{{ form.get('username', '') }}" maxlength="32" required />
       </div>
 
       <div class="form-row">
@@ -214,7 +214,7 @@
         roleOptions.forEach(function (opt) {
           if (!opt.value) return; // keep the placeholder option as-is
           var optDept = opt.getAttribute('data-department') || '';
-          var matches = !dept || !optDept || optDept === dept;
+          var matches = !dept || dept === '__other__' || !optDept || optDept === dept;
           opt.hidden = !matches;
           opt.disabled = !matches;
           if (matches && opt.value === currentValue) currentStillValid = true;
@@ -229,47 +229,47 @@
       filterRoles();
     })();
 
-    // "+ Add new department / designation" -> a dedicated ＋ button slides the
-    // text field in (in the exact same spot as the dropdown), with a link back.
+    // Selecting "Other" swaps the dropdown for a text field right in the same
+    // spot (no extra row): the select hides and the "Please specify" input
+    // takes its place inline, with a small × to switch back to the list.
+    // Department and designation are wired independently — picking "Other"
+    // for one never forces the other into "Other" mode, so the full
+    // designation list stays pickable even while typing a new department.
     (function () {
-      function wireAddNew(selectId, wrapId, inputId, cancelId, btnId, modeId, onActivate) {
+      function wireAddNew(selectId, wrapId, inputId, clearBtnId, modeId) {
         var select = document.getElementById(selectId);
         var wrap = document.getElementById(wrapId);
         var input = document.getElementById(inputId);
-        var cancel = document.getElementById(cancelId);
-        var btn = document.getElementById(btnId);
+        var clearBtn = document.getElementById(clearBtnId);
         var mode = document.getElementById(modeId);
-        if (!select || !wrap || !input || !cancel || !btn || !mode) return null;
+        if (!select || !wrap || !input || !clearBtn || !mode) return null;
 
         function showInput() {
-          select.classList.add('is-hidden');
-          btn.style.display = 'none';
+          if (select.value !== '__other__') select.value = '__other__';
+          select.style.display = 'none';
+          select.required = false;
           wrap.classList.add('open');
           input.required = true;
-          select.required = false;
           mode.value = 'new';
-          setTimeout(function () { input.focus(); }, 180);
-          if (onActivate) onActivate();
+          setTimeout(function () { input.focus(); }, 50);
         }
 
         function showSelect() {
-          select.classList.remove('is-hidden');
-          btn.style.display = '';
           wrap.classList.remove('open');
+          select.style.display = '';
+          select.required = true;
           input.required = false;
           input.value = '';
-          select.required = true;
           select.value = '';
           mode.value = 'existing';
           select.dispatchEvent(new Event('change'));
         }
 
-        btn.addEventListener('click', function (e) {
-          e.preventDefault();
-          showInput();
+        select.addEventListener('change', function () {
+          if (select.value === '__other__') showInput();
         });
 
-        cancel.addEventListener('click', function (e) {
+        clearBtn.addEventListener('click', function (e) {
           e.preventDefault();
           showSelect();
         });
@@ -279,15 +279,26 @@
         return { showInput: showInput };
       }
 
-      // A brand-new department can't have any existing designations yet, so
-      // choosing "Add new department" also switches Designation into "add new"
-      // mode automatically — no need to pick that separately.
-      var roleToggle = wireAddNew('role', 'role_new_wrap', 'new_role', 'role_cancel_new', 'role_add_btn', 'role_mode');
-      wireAddNew('department', 'department_new_wrap', 'new_department', 'department_cancel_new', 'department_add_btn', 'department_mode', function () {
-        if (roleToggle) roleToggle.showInput();
-      });
+      wireAddNew('department', 'department_input_wrap', 'new_department', 'department_clear_btn', 'department_mode');
+      wireAddNew('role', 'role_input_wrap', 'new_role', 'role_clear_btn', 'role_mode');
     })();
+
+    // After a failed submit, the server re-renders this page with an error
+    // message but a fresh page load has no native "invalid field" focus of
+    // its own — so put the cursor back on whichever field caused the error
+    // (e.g. the email field when the gmail-only check fails).
+    {% if focus_field %}
+    (function () {
+      var el = document.getElementById("{{ focus_field }}");
+      if (!el) return;
+      el.focus();
+      if (el.select) el.select();
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    })();
+    {% endif %}
+
   </script>
 
 </body>
 </html>
+     

@@ -7,7 +7,8 @@
   <div>
     <div class="eyebrow">Organization</div>
     <h1>Departments</h1>
-    <p class="sub">{{ departments|length }} department{{ 's' if departments|length != 1 else '' }}</p>
+    {% set card_count = departments|length + (1 if others_summary and not selected_department else 0) %}
+    <p class="sub">{{ card_count }} department{{ 's' if card_count != 1 else '' }}</p>
   </div>
 </div>
 
@@ -62,8 +63,37 @@
   </a>
   {# whole card is the live link to that department's employees — no separate "View employees" button #}
   {% else %}
+  {% if not others_summary %}
   <p style="color: var(--text-muted);">{% if selected_department %}No department named "{{ selected_department }}".{% else %}No departments yet — add one above.{% endif %}</p>
+  {% endif %}
   {% endfor %}
+
+  {% if others_summary and not selected_department %}
+  <a href="{{ url_for('departments_others') }}" class="card stat-card stat-card-link">
+    <div class="stat-corner" style="background: var(--text-muted);"></div>
+    <div class="stat-label">Others</div>
+    <div class="stat-value">{{ others_summary.count }}</div>
+    <div style="margin-top: 6px; font-size: 13px; color: var(--text-muted);">
+      Total Salary: ₹{{ "{:,.0f}".format(others_summary.total_salary) }}
+    </div>
+    {% if others_summary.members %}
+    <div style="margin-top: 12px; display: flex; align-items: center;">
+      {% for member_name in others_summary.members[:3] %}
+      <div style="{% if not loop.first %}margin-left: -8px;{% endif %} border: 2px solid var(--surface); border-radius: 50%;">
+        {{ avatar(member_name, 30) }}
+      </div>
+      {% endfor %}
+      {% if others_summary.members|length > 3 %}
+      <div style="margin-left: -8px; border: 2px solid var(--surface); border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text-muted); font-size: 11px; font-weight: 700; flex-shrink: 0;">
+        +{{ others_summary.members|length - 3 }}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </a>
+  {# clicking "Others" opens a dedicated page listing every custom/typed-in department individually #}
+  {% endif %}
 </div>
 
 {% endblock %}
+

@@ -222,11 +222,14 @@ def inject_user():
             db = get_db()
             user_id = session.get("user_id")
             if user_id:
-                # Only announcements this user hasn't opened the list for yet.
+                # Only announcements this user hasn't opened the list for yet,
+                # and hasn't cleared from their own view.
                 announcement_count = db.execute(
                     "SELECT COUNT(*) FROM announcements a WHERE NOT EXISTS "
-                    "(SELECT 1 FROM announcement_reads r WHERE r.announcement_id = a.id AND r.user_id = ?)",
-                    (user_id,),
+                    "(SELECT 1 FROM announcement_reads r WHERE r.announcement_id = a.id AND r.user_id = ?) "
+                    "AND NOT EXISTS "
+                    "(SELECT 1 FROM announcement_clears c WHERE c.announcement_id = a.id AND c.user_id = ?)",
+                    (user_id, user_id),
                 ).fetchone()[0]
             else:
                 announcement_count = db.execute("SELECT COUNT(*) FROM announcements").fetchone()[0]
@@ -563,6 +566,20 @@ def is_role_valid_for_department(db, department, role):
     if row is None:
         return False
     return not row["department"] or row["department"] == department
+
+
+def add_department_if_new(db, name):
+    """No-op kept for backward compatibility. A department typed via "Other"
+    is intentionally NEVER written into the shared departments table anymore —
+    see the note at each call site for why."""
+    return
+
+
+def add_designation_if_new(db, name, department):
+    """No-op kept for backward compatibility. A designation typed via "Other"
+    is intentionally NEVER written into the shared designations table anymore —
+    see the note at each call site for why."""
+    return
 
 
 # ---------------------------------------------------------------------------
@@ -958,17 +975,20 @@ def add_employee():
             flash("Please use a valid @gmail.com email address.")
             return rerender()
 
-        # A custom "Other" department/designation belongs only to this person —
-        # it's never inserted into the shared departments/designations tables,
-        # so it never mixes into the dropdown options anyone else sees.
+        # A custom "Other" department/designation belongs only to this employee's
+        # own record — it is never written into the shared departments/designations
+        # tables, so it never shows up as a selectable option for anyone else and
+        # disappears on its own once no employee is using it anymore.
         if department_mode == "new":
             department = new_department
+            add_department_if_new(db, department)
         elif department not in dept_names:
             flash("Please choose a valid department and designation from the list.")
             return rerender()
 
         if role_mode == "new":
             role = new_role
+            add_designation_if_new(db, role, department)
         elif role not in role_names or not is_role_valid_for_department(db, department, role):
             flash("Please choose a valid department and designation from the list.")
             return rerender()
@@ -1108,6 +1128,40 @@ def delete_employee(emp_id):
 # ---------------------------------------------------------------------------
 # Department management
 # ---------------------------------------------------------------------------
+
+# Departments outside the official set are treated as "Other" — typed in via
+# the "Other" option on signup / Add Employee instead of picked from the list,
+# and never written into the shared departments table (see add_department_if_new
+# above). They're grouped behind a single "Others" card on the Departments page,
+# derived live from whichever employees currently carry that department text —
+# so a custom department appears only while someone is on it, and disappears on
+# its own, everywhere, the moment no one is.
+def get_official_department_names(db):
+    """Lowercased names of the "official" departments: the fixed set the app
+    ships with, plus anything an admin has deliberately added via
+    "+ Add Department" on this page."""
+    rows = db.execute("SELECT name FROM departments").fetchall()
+    return {row["name"].lower() for row in rows}
+
+
+def _department_stats(db):
+    """Per-department employee counts, total salary and member names, keyed by
+    department name. Shared by the main Departments page and the Others
+    drill-down page so both stay in sync."""
+    counts = {
+        row["department"]: row["count"]
+        for row in db.execute("SELECT department, COUNT(*) as count FROM employees GROUP BY department").fetchall()
+    }
+    salaries = {
+        row["department"]: row["total"]
+        for row in db.execute("SELECT department, SUM(salary) as total FROM employees GROUP BY department").fetchall()
+    }
+    members = {}
+    for row in db.execute("SELECT department, name FROM employees ORDER BY name").fetchall():
+        members.setdefault(row["department"], []).append(row["name"])
+    return counts, salaries, members
+
+
 @app.route("/departments", methods=["GET", "POST"])
 @login_required
 @roles_required("Admin", "HR Manager")
@@ -1130,53 +1184,97 @@ def departments():
 
     department = request.args.get("department", "").strip()
 
-    dept_query = "SELECT id, name FROM departments"
-    dept_params = []
-    if department:
-        dept_query += " WHERE name = ?"
-        dept_params.append(department)
-    dept_query += " ORDER BY name"
+    official_names = get_official_department_names(db)
+    counts, salaries, members = _department_stats(db)
 
-    dept_rows = db.execute(dept_query, dept_params).fetchall()
-    counts = {
-        row["department"]: row["count"]
-        for row in db.execute("SELECT department, COUNT(*) as count FROM employees GROUP BY department").fetchall()
-    }
-    salaries = {
-        row["department"]: row["total"]
-        for row in db.execute("SELECT department, SUM(salary) as total FROM employees GROUP BY department").fetchall()
-    }
-
-    members = {}
-    for row in db.execute("SELECT department, name FROM employees ORDER BY name").fetchall():
-        members.setdefault(row["department"], []).append(row["name"])
+    def build_card(name):
+        return {
+            "name": name,
+            "count": counts.get(name, 0),
+            "total_salary": salaries.get(name) or 0,
+            "members": members.get(name, []),
+        }
 
     # Only departments that actually have at least one employee are shown —
-    # a department defined in Settings with nobody assigned yet stays hidden
-    # here until someone joins it.
-    dept_list = [
-        {
-            "id": row["id"],
-            "name": row["name"],
-            "count": counts.get(row["name"], 0),
-            "total_salary": salaries.get(row["name"]) or 0,
-            "members": members.get(row["name"], []),
-        }
-        for row in dept_rows
-        if counts.get(row["name"], 0) > 0
-    ]
+    # a department defined here with nobody assigned yet stays hidden until
+    # someone joins it.
+    active_names = sorted(n for n in counts if n and counts.get(n, 0) > 0)
 
-    all_dept_names = [
-        row["name"] for row in db.execute("SELECT name FROM departments ORDER BY name").fetchall()
-        if counts.get(row["name"], 0) > 0
-    ]
+    if department:
+        core_list = [build_card(n) for n in active_names if n == department]
+        others_summary = None
+    else:
+        core_list = [build_card(n) for n in active_names if n.lower() in official_names]
+        other_list = [build_card(n) for n in active_names if n.lower() not in official_names]
+
+        others_summary = None
+        if other_list:
+            other_members = []
+            for d in other_list:
+                other_members.extend(d["members"])
+            others_summary = {
+                "count": sum(d["count"] for d in other_list),
+                "total_salary": sum(d["total_salary"] for d in other_list),
+                "members": other_members,
+            }
 
     return render_template(
         "departments.html",
-        departments=dept_list,
-        all_departments=all_dept_names,
+        departments=core_list,
+        others_summary=others_summary,
+        all_departments=active_names,
         selected_department=department,
     )
+
+
+@app.route("/departments/others")
+@login_required
+@roles_required("Admin", "HR Manager")
+def departments_others():
+    db = get_db()
+    official_names = get_official_department_names(db)
+    counts, salaries, members = _department_stats(db)
+
+    other_names = sorted(
+        n for n in counts if n and counts.get(n, 0) > 0 and n.lower() not in official_names
+    )
+    dept_list = [
+        {
+            "name": name,
+            "count": counts.get(name, 0),
+            "total_salary": salaries.get(name) or 0,
+            "members": members.get(name, []),
+        }
+        for name in other_names
+    ]
+
+    return render_template("departments_others.html", departments=dept_list)
+
+
+@app.route("/departments/others/delete", methods=["POST"])
+@login_required
+@roles_required("Admin", "HR Manager")
+def delete_other_department():
+    db = get_db()
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Department not found.")
+        return redirect(url_for("departments_others"))
+
+    official_names = get_official_department_names(db)
+    if name.lower() in official_names:
+        flash(f'"{name}" is an official department — remove it from the Departments page instead.')
+        return redirect(url_for("departments_others"))
+
+    count = db.execute("SELECT COUNT(*) FROM employees WHERE department = ?", (name,)).fetchone()[0]
+    if count:
+        db.execute("UPDATE employees SET department = '' WHERE department = ?", (name,))
+        db.commit()
+        log_audit("Custom department deleted", f"{name} (cleared from {count} employee(s))")
+        flash(f'Deleted "{name}" — cleared from {count} employee(s). Please assign them a department.')
+    else:
+        flash(f'"{name}" is not in use anymore.')
+    return redirect(url_for("departments_others"))
 
 
 @app.route("/departments/<int:dept_id>/delete", methods=["POST"])
@@ -1234,7 +1332,80 @@ def designations():
         for row in rows
     ]
 
-    return render_template("designations.html", designations=designation_list, departments=dept_names)
+    # A designation typed via "Other" is never written into this table (see
+    # add_designation_if_new) — it lives only as free text on the employees who
+    # hold it. Fold whichever of those are currently in use into one "Others"
+    # row, computed live, so it appears only while someone holds it and
+    # disappears everywhere on its own once no one does.
+    official_names = {row["name"].lower() for row in rows}
+    other_names = sorted(
+        n for n in counts if n and counts.get(n, 0) > 0 and n.lower() not in official_names
+    )
+    others_summary = {"count": sum(counts[n] for n in other_names)} if other_names else None
+
+    return render_template(
+        "designations.html",
+        designations=designation_list,
+        departments=dept_names,
+        others_summary=others_summary,
+    )
+
+
+@app.route("/designations/others")
+@login_required
+@roles_required("Admin", "HR Manager")
+def designations_others():
+    db = get_db()
+    rows = db.execute("SELECT name FROM designations").fetchall()
+    official_names = {row["name"].lower() for row in rows}
+
+    counts = {
+        row["role"]: row["count"]
+        for row in db.execute("SELECT role, COUNT(*) as count FROM employees GROUP BY role").fetchall()
+    }
+    dept_by_role = {}
+    for row in db.execute("SELECT DISTINCT role, department FROM employees").fetchall():
+        dept_by_role.setdefault(row["role"], set()).add(row["department"])
+
+    other_names = sorted(
+        n for n in counts if n and counts.get(n, 0) > 0 and n.lower() not in official_names
+    )
+    designation_list = [
+        {
+            "name": name,
+            "count": counts.get(name, 0),
+            "departments": sorted(d for d in dept_by_role.get(name, []) if d),
+        }
+        for name in other_names
+    ]
+
+    return render_template("designations_others.html", designations=designation_list)
+
+
+@app.route("/designations/others/delete", methods=["POST"])
+@login_required
+@roles_required("Admin", "HR Manager")
+def delete_other_designation():
+    db = get_db()
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Designation not found.")
+        return redirect(url_for("designations_others"))
+
+    official_names = {row["name"].lower() for row in db.execute("SELECT name FROM designations").fetchall()}
+    if name.lower() in official_names:
+        flash(f'"{name}" is an official designation — remove it from the Designations page instead.')
+        return redirect(url_for("designations_others"))
+
+    count = db.execute("SELECT COUNT(*) FROM employees WHERE role = ?", (name,)).fetchone()[0]
+    if count:
+        db.execute("UPDATE employees SET role = '' WHERE role = ?", (name,))
+        db.commit()
+        log_audit("Custom designation deleted", f"{name} (cleared from {count} employee(s))")
+        flash(f'Deleted "{name}" — cleared from {count} employee(s). Please assign them a designation.')
+    else:
+        flash(f'"{name}" is not in use anymore.')
+    return redirect(url_for("designations_others"))
 
 
 @app.route("/designations/<int:des_id>/delete", methods=["POST"])
@@ -1261,7 +1432,7 @@ def delete_designation(des_id):
 @app.route("/attendance/update/<int:emp_id>", methods=["POST"])
 @login_required
 def attendance_update_one(emp_id):
-    is_staff = session.get("role") in ("Admin", "HR Manager")
+    is_staff = session.get("role") in ("Admin", "HR", "HR Manager")
     payload = request.get_json(silent=True) or {}
     selected_date = payload.get("date") or date.today().isoformat()
 
@@ -1303,7 +1474,7 @@ def attendance_update_one(emp_id):
 @login_required
 def attendance():
     db = get_db()
-    is_staff = session.get("role") in ("Admin", "HR Manager")
+    is_staff = session.get("role") in ("Admin", "HR", "HR Manager")
     selected_date = request.form.get("date") or request.args.get("date") or date.today().isoformat()
 
     if request.method == "POST":
@@ -1374,7 +1545,7 @@ def attendance():
 @login_required
 def attendance_present():
     db = get_db()
-    is_staff = session.get("role") in ("Admin", "HR Manager")
+    is_staff = session.get("role") in ("Admin", "HR", "HR Manager")
     selected_date = request.args.get("date") or date.today().isoformat()
 
     if is_staff:
@@ -1406,7 +1577,7 @@ def attendance_present():
 @login_required
 def attendance_checkout(emp_id):
     db = get_db()
-    is_staff = session.get("role") in ("Admin", "HR Manager")
+    is_staff = session.get("role") in ("Admin", "HR", "HR Manager")
     selected_date = request.form.get("date") or date.today().isoformat()
 
     if not is_staff and current_employee_id() != emp_id:
@@ -1741,12 +1912,21 @@ def clear_audit_logs():
 @login_required
 def announcements():
     db = get_db()
-    rows = db.execute("SELECT * FROM announcements ORDER BY id DESC").fetchall()
+    user_id = session.get("user_id")
+    if user_id:
+        # Never show an announcement this user has cleared from their own view.
+        rows = db.execute(
+            "SELECT * FROM announcements a WHERE NOT EXISTS "
+            "(SELECT 1 FROM announcement_clears c WHERE c.announcement_id = a.id AND c.user_id = ?) "
+            "ORDER BY id DESC",
+            (user_id,),
+        ).fetchall()
+    else:
+        rows = db.execute("SELECT * FROM announcements ORDER BY id DESC").fetchall()
     can_post = session.get("role") in ("Admin", "HR", "HR Manager")
 
     # Opening the list marks every announcement in it as seen for this user,
     # so the unread badge count in the navbar drops right away.
-    user_id = session.get("user_id")
     if user_id and rows:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         db.executemany(
@@ -1806,6 +1986,14 @@ def edit_announcement(ann_id):
             "UPDATE announcements SET title = ?, message = ?, updated_by = ?, updated_at = ? WHERE id = ?",
             (title, message, session.get("username"), datetime.now().strftime("%Y-%m-%d %H:%M"), ann_id),
         )
+        # An edit counts as new content, so clear everyone else's "seen" mark
+        # for this announcement — it shows up as unread/notifying again for
+        # them, minus whoever cleared it entirely from their own view. The
+        # editor themself doesn't need to be re-notified of their own edit.
+        db.execute(
+            "DELETE FROM announcement_reads WHERE announcement_id = ? AND user_id != ?",
+            (ann_id, session.get("user_id")),
+        )
         db.commit()
         log_audit("Announcement edited", f"title={title}, id={ann_id}")
         flash("Announcement updated.")
@@ -1819,21 +2007,19 @@ def edit_announcement(ann_id):
     )
 
 
-@app.route("/announcements/<int:ann_id>/delete", methods=["POST"])
+@app.route("/announcements/<int:ann_id>/clear", methods=["POST"])
 @login_required
-@roles_required("Admin", "HR", "HR Manager")
-def delete_announcement(ann_id):
+def clear_announcement(ann_id):
+    """Hide this announcement from the current user's own view only — it is
+    never deleted and every other user still sees it normally."""
     db = get_db()
-    reason = request.form.get("reason", "").strip()
-    if not reason:
-        flash("Please provide a reason for deleting this announcement.")
-        return redirect(url_for("announcements"))
-
-    ann = db.execute("SELECT title FROM announcements WHERE id = ?", (ann_id,)).fetchone()
-    db.execute("DELETE FROM announcements WHERE id = ?", (ann_id,))
-    db.commit()
-    log_audit("Announcement deleted", f"{ann['title'] if ann else ann_id}, id={ann_id}, reason={reason}")
-    flash("Announcement deleted.")
+    user_id = session.get("user_id")
+    if user_id:
+        db.execute(
+            "INSERT OR IGNORE INTO announcement_clears (user_id, announcement_id, cleared_at) VALUES (?, ?, ?)",
+            (user_id, ann_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        )
+        db.commit()
     return redirect(url_for("announcements"))
 
 
@@ -1865,60 +2051,66 @@ def signup():
         experience_raw = form.get("experience_years", "").strip()
         hire_date = form.get("hire_date", "").strip() or date.today().isoformat()
 
-        def rerender():
-            return render_template("signup.html", form=form, departments=dept_names, roles=role_names, role_rows=role_rows)
+        def rerender(focus_field=None):
+            return render_template(
+                "signup.html", form=form, departments=dept_names, roles=role_names,
+                role_rows=role_rows, focus_field=focus_field,
+            )
 
         if not all([username, password, first_name, last_name, email]):
             flash("Please fill in all required fields.")
+            for field_id, value in (("first_name", first_name), ("last_name", last_name), ("email", email), ("username", username), ("password", password)):
+                if not value:
+                    return rerender(field_id)
             return rerender()
 
         if len(first_name) > 16:
             flash("First name must be 16 characters or fewer.")
-            return rerender()
+            return rerender("first_name")
 
         if not NAME_RE.match(first_name):
             flash("First name can only contain letters.")
-            return rerender()
+            return rerender("first_name")
 
         if len(last_name) > 16:
             flash("Last name must be 16 characters or fewer.")
-            return rerender()
+            return rerender("last_name")
 
         if not NAME_RE.match(last_name):
             flash("Last name can only contain letters.")
-            return rerender()
+            return rerender("last_name")
 
         if len(username) > 32:
             flash("Username must be 32 characters or fewer.")
-            return rerender()
+            return rerender("username")
 
         if department_mode == "new":
             if not new_department:
                 flash("Please enter a name for the new department.")
-                return rerender()
+                return rerender("new_department")
         elif not department:
             flash("Please select a department.")
-            return rerender()
+            return rerender("department")
 
         if role_mode == "new":
             if not new_role:
                 flash("Please enter a name for the new designation.")
-                return rerender()
+                return rerender("new_role")
         elif not role:
             flash("Please select a designation.")
-            return rerender()
+            return rerender("role")
 
         if password != confirm_password:
             flash("Passwords do not match.")
-            return rerender()
+            return rerender("confirm_password")
 
         if len(password) < 4:
             flash("Password must be at least 4 characters.")
-            return rerender()
+            return rerender("password")
 
         if not GMAIL_RE.match(email):
             flash("Please sign up with a valid @gmail.com email address.")
-            return rerender()
+            return rerender("email")
 
         # A custom "Other" department/designation belongs only to this person —
         # it's never inserted into the shared departments/designations tables,
@@ -1927,17 +2119,17 @@ def signup():
             department = new_department
         elif department not in dept_names:
             flash("Please choose a valid department and designation from the list.")
-            return rerender()
+            return rerender("department")
 
         if role_mode == "new":
             role = new_role
         elif role not in role_names or not is_role_valid_for_department(db, department, role):
             flash("Please choose a valid department and designation from the list.")
-            return rerender()
+            return rerender("role")
 
         if phone and (not phone.isdigit() or len(phone) != 10):
             flash("Phone number must be exactly 10 digits.")
-            return rerender()
+            return rerender("phone")
 
         experience_years = None
         if experience_raw:
@@ -1945,7 +2137,7 @@ def signup():
                 experience_years = float(experience_raw)
             except ValueError:
                 flash("Experience must be a number.")
-                return rerender()
+                return rerender("experience_years")
 
         username_taken = db.execute(
             "SELECT 1 FROM users WHERE username = ? COLLATE NOCASE", (username,)
@@ -1956,7 +2148,7 @@ def signup():
         ).fetchone()
         if username_taken or request_pending:
             flash("That username is already taken. Please choose another.")
-            return rerender()
+            return rerender("username")
 
         db.execute(
             "INSERT INTO signup_requests (username, password_hash, first_name, last_name, email, phone, "
@@ -1986,6 +2178,7 @@ def signup():
         departments=dept_names,
         roles=role_names,
         role_rows=role_rows,
+        focus_field=None,
     )
 
 
@@ -2026,6 +2219,13 @@ def approve_signup_request(req_id):
         return redirect(url_for("signup_requests"))
 
     name = f"{req['first_name']} {req['last_name']}".strip()
+    # Whatever the person specified via "Other" at signup stays as free text on
+    # their own employee record only — it's never written into the shared
+    # departments/designations tables, so it never becomes a selectable option
+    # for anyone else, and it disappears on its own if this employee is later
+    # removed or moved to a different department/designation.
+    add_department_if_new(db, req["department"])
+    add_designation_if_new(db, req["role"], req["department"])
     cur = db.execute(
         "INSERT INTO employees (name, email, phone, department, role, status, experience_years, join_date) "
         "VALUES (?, ?, ?, ?, ?, 'Active', ?, ?)",
@@ -2402,3 +2602,4 @@ init_db()
 
 if __name__ == "__main__":
     app.run(debug=True)
+
